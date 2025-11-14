@@ -1,5 +1,5 @@
 const whatsappService = require('../services/whatsappService');
-const geminiService = require('../services/geminiService');
+const aiService = require('../services/openaiService'); // Cambiado de geminiService a openaiService
 const calendarService = require('../services/calendarService');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -46,7 +46,7 @@ class MessageController {
       });
 
       // Calificar el lead basado en la conversación
-      const leadScore = geminiService.qualifyLead(session.history);
+      const leadScore = aiService.qualifyLead(session.history);
       session.leadScore = leadScore;
 
       logger.info('🎯 Lead actualizado', {
@@ -56,15 +56,15 @@ class MessageController {
         phase: leadScore.phase,
       });
 
-      // Generar respuesta con Gemini (con contexto del lead)
-      const aiResponse = await geminiService.generateResponse(
+      // Generar respuesta con OpenAI (con contexto del lead)
+      const aiResponse = await aiService.generateResponse(
         userMessage,
         session.history.slice(-5), // Solo últimos 5 mensajes (optimizado para reducir tokens)
         leadScore
       );
 
       // Limpiar respuesta
-      const cleanResponse = geminiService.cleanResponse(aiResponse);
+      const cleanResponse = aiService.cleanResponse(aiResponse);
 
       // Agregar respuesta al historial
       session.history.push({
@@ -206,7 +206,7 @@ class MessageController {
       session.lastEvent = event;
 
       // Generar mensaje de confirmación
-      const confirmationMessage = await geminiService.generateMeetingSummary(scheduleData);
+      const confirmationMessage = await aiService.generateMeetingSummary(scheduleData);
 
       // Enviar confirmación
       await whatsappService.sendTextMessage(

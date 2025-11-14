@@ -14,7 +14,13 @@ const config = {
     baseUrl: 'https://graph.facebook.com',
   },
 
-  // Gemini AI
+  // OpenAI (reemplaza Gemini)
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY,
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  },
+
+  // Gemini AI (legacy - mantener por si acaso)
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
     model: process.env.GEMINI_MODEL || 'gemini-pro',
@@ -47,7 +53,7 @@ const config = {
 const requiredEnvVars = [
   'WHATSAPP_PHONE_NUMBER_ID',
   'WHATSAPP_ACCESS_TOKEN',
-  'GEMINI_API_KEY',
+  'OPENAI_API_KEY', // Cambiado de GEMINI_API_KEY
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
 ];
