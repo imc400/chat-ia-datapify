@@ -90,7 +90,11 @@ class MessageController {
       session.lastActivity = Date.now();
 
     } catch (error) {
-      logger.error('Error procesando mensaje:', error);
+      logger.error('Error procesando mensaje:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
 
       // Enviar mensaje de error al usuario
       try {

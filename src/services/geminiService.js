@@ -262,7 +262,12 @@ Zona: ${bk.business_hours.timezone}
 
       return responseText;
     } catch (error) {
-      logger.error('Error generando respuesta con Gemini:', error);
+      logger.error('Error generando respuesta con Gemini:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code,
+      });
       throw error;
     }
   }
