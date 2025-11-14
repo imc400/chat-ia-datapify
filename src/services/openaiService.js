@@ -120,13 +120,37 @@ LO QUE NO DEBES HACER:
         });
       }
 
-      // Agregar historial (últimos 5 mensajes)
-      conversationHistory.slice(-5).forEach(msg => {
+      // Agregar historial (últimos 8 mensajes para mejor memoria)
+      const recentHistory = conversationHistory.slice(-8);
+
+      if (recentHistory.length > 0) {
+        // Resumen del historial para que NO olvide
+        const historyText = recentHistory.map(msg => {
+          const role = msg.role === 'usuario' ? 'Usuario' : 'Tú';
+          return `${role}: ${msg.content}`;
+        }).join('\n');
+
         messages.push({
-          role: msg.role === 'usuario' ? 'user' : 'assistant',
-          content: msg.content,
+          role: 'system',
+          content: `HISTORIAL DE CONVERSACIÓN (LEE ESTO ANTES DE RESPONDER):
+${historyText}
+
+IMPORTANTE:
+- NO preguntes lo que YA te dijeron
+- USA la información del historial
+- Si ya conoces su nombre, úsalo
+- Si ya sabes su negocio/productos, NO lo vuelvas a preguntar
+- Si ya confirmó Shopify, NO lo vuelvas a preguntar`,
         });
-      });
+
+        // Agregar mensajes al formato OpenAI
+        recentHistory.forEach(msg => {
+          messages.push({
+            role: msg.role === 'usuario' ? 'user' : 'assistant',
+            content: msg.content,
+          });
+        });
+      }
 
       // Agregar instrucciones críticas justo antes del mensaje del usuario
       messages.push({
@@ -158,11 +182,19 @@ Usuario: "Sí, en Shopify. Pero las ventas están bajando"
 ❌ MAL: "¿Cuánto inviertes en publicidad?"
 ✅ BIEN: "Entiendo, es frustrante. ¿Hace cuánto notas la baja?"
 
+EJEMPLO 6 - MEMORIA (MUY IMPORTANTE):
+[Historial: Usuario dijo "Vendo poleras y pantalones" y "Sí, en Shopify"]
+Usuario: "No sé qué hacer"
+❌ MAL: "¿Qué productos vendes?" ← YA LO DIJO
+❌ MAL: "¿Está en Shopify?" ← YA LO CONFIRMÓ
+✅ BIEN: "Entiendo. ¿Has probado cambiar algo en tus anuncios?" ← Usa la info que ya tienes
+
 CRÍTICO:
-- PRIMERO saluda, LUEGO califica
-- Pregunta nombre ANTES de preguntar del negocio
-- Comenta algo sobre su respuesta antes de siguiente pregunta
-- NO seas obvio que estás calificando
+- LEE EL HISTORIAL antes de responder
+- NO preguntes lo que YA te dijeron
+- USA el nombre si ya lo sabes
+- USA la info que ya te dieron (productos, plataforma, etc)
+- Si ya conoces algo, NO lo vuelvas a preguntar
 - 1 pregunta por mensaje, max 2 líneas`,
       });
 

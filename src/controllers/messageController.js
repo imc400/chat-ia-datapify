@@ -59,7 +59,7 @@ class MessageController {
       // Generar respuesta con OpenAI (con contexto del lead)
       const aiResponse = await aiService.generateResponse(
         userMessage,
-        session.history.slice(-5), // Solo últimos 5 mensajes (optimizado para reducir tokens)
+        session.history.slice(-8), // Últimos 8 mensajes para mejor memoria (aumentado de 5)
         leadScore
       );
 
