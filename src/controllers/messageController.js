@@ -59,7 +59,7 @@ class MessageController {
       // Generar respuesta con Gemini (con contexto del lead)
       const aiResponse = await geminiService.generateResponse(
         userMessage,
-        session.history.slice(-10), // Solo últimos 10 mensajes para contexto
+        session.history.slice(-5), // Solo últimos 5 mensajes (optimizado para reducir tokens)
         leadScore
       );
 
