@@ -9,6 +9,9 @@ const oauthRoutes = require('./src/routes/oauth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Confiar en proxies (necesario para Railway, Heroku, etc.)
+app.set('trust proxy', 1);
+
 // Middleware de seguridad
 app.use(helmet());
 
