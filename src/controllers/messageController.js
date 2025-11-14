@@ -75,14 +75,21 @@ class MessageController {
       // Enviar respuesta del agente
       await whatsappService.sendTextMessage(from, cleanResponse);
 
-      // Verificar si el usuario está pidiendo el link directamente
-      const askingForLink = userMessage.toLowerCase().includes('link') ||
-                           userMessage.toLowerCase().includes('agendar') ||
-                           userMessage.toLowerCase().includes('reunión');
+      // NUEVA LÓGICA: Solo enviar link cuando usuario CONFIRMA explícitamente
+      // Debe cumplir AMBAS condiciones:
+      // 1. El agente preguntó por agendar en su respuesta actual O en la anterior
+      // 2. El usuario confirma en su mensaje actual
 
-      // Verificar si debe enviar link de agendamiento
-      // Lo hacemos DESPUÉS de enviar la respuesta para mejor UX
-      if (askingForLink || this.shouldSendBookingLink(userMessage, cleanResponse, leadScore)) {
+      const agentAskedToSchedule = cleanResponse.toLowerCase().includes('agend') ||
+                                   cleanResponse.toLowerCase().includes('reuni') ||
+                                   cleanResponse.toLowerCase().includes('llam') ||
+                                   (session.history.length >= 2 &&
+                                    session.history[session.history.length - 2].content.toLowerCase().includes('agend'));
+
+      const userConfirms = this.userConfirmsScheduling(userMessage);
+
+      // Solo enviar link si el agente preguntó Y el usuario confirma
+      if (agentAskedToSchedule && userConfirms) {
         await this.sendBookingLink(from);
       }
 
@@ -109,32 +116,34 @@ class MessageController {
   }
 
   /**
-   * Determina si debe enviar el link de agendamiento
+   * Verifica si el usuario está confirmando que quiere agendar
+   * Más estricto: solo palabras de confirmación clara
    */
-  shouldSendBookingLink(userMessage, agentResponse, leadScore) {
-    // Solo para leads calientes
-    if (leadScore.temperature !== 'hot') {
-      return false;
-    }
-
-    // Palabras clave que indican aceptación de agendar
-    const acceptanceKeywords = [
-      'si', 'sí', 'dale', 'perfecto', 'ok', 'bueno', 'genial', 'demás',
-      'claro', 'obvio', 'seguro', 'ya', 'sale', 'bakán', 'agend', 'reun'
+  userConfirmsScheduling(userMessage) {
+    const confirmationKeywords = [
+      'si', 'sí', 'dale', 'ok', 'okay', 'ya', 'claro', 'seguro',
+      'perfecto', 'bueno', 'genial', 'demás', 'sale', 'obvio',
+      'bakán', 'agendemos', 'agendamos', 'agendo', 'me tinca'
     ];
 
-    const userLower = userMessage.toLowerCase();
-    const agentLower = agentResponse.toLowerCase();
+    const userLower = userMessage.toLowerCase().trim();
 
-    // Verificar si el usuario acepta y el agente está hablando de agendar
-    const userAccepts = acceptanceKeywords.some(kw => userLower.includes(kw));
-    const agentMentionsScheduling = agentLower.includes('agend') ||
-      agentLower.includes('reuni') ||
-      agentLower.includes('llam') ||
-      agentLower.includes('convers') ||
-      agentLower.includes('junt');
+    // Verificar si el mensaje del usuario contiene confirmación
+    return confirmationKeywords.some(kw => {
+      // Mensaje completo es solo la keyword (ej: "si", "dale")
+      if (userLower === kw) return true;
+      // O contiene la keyword con espacio (para evitar falsos positivos)
+      if (userLower.includes(` ${kw} `) || userLower.startsWith(`${kw} `) || userLower.endsWith(` ${kw}`)) return true;
+      return false;
+    });
+  }
 
-    return userAccepts && agentMentionsScheduling;
+  /**
+   * LEGACY - Determina si debe enviar el link de agendamiento (ya no se usa)
+   */
+  shouldSendBookingLink(userMessage, agentResponse, leadScore) {
+    // Esta función ya no se usa, se mantiene por compatibilidad
+    return false;
   }
 
   /**

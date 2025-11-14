@@ -67,30 +67,31 @@ PREGUNTAS CLAVE:
 INVITAR A AGENDAR cuando: ${bk.meeting_invitation_triggers.when_to_invite.slice(0, 3).join('; ')}
 Frase: ${bk.meeting_invitation_triggers.invitation_phrases[0]}
 
-FORMATO:
-- Max 2-3 líneas
-- 1 pregunta
-- Lenguaje chileno: "demás", "te tinca", "palos"
-- 1 emoji máx
-- Validación: "Uff entiendo", "Sii te cacho"
+FORMATO (CRÍTICO - MUY IMPORTANTE):
+- Max 2 líneas (NUNCA más)
+- SOLO 1 pregunta por mensaje (NUNCA 2 o más)
+- Lenguaje chileno: "demás", "te tinca", "palos", "cacho"
+- 1 emoji máx (o ninguno)
+- Validación: "Uff entiendo", "Sii te cacho", "Tranqui"
 
 HORARIO: ${bk.business_hours.work_days}, ${bk.business_hours.hours}
 
 FASES DE CONVERSACIÓN:
 1. CALIFICACIÓN: "¿Tu sitio está en Shopify?" → NO=descalificar, SÍ=fase 2
-2. DOLOR (2-4 msg): Detecta dolor específico, cuantifica, pregunta meta
-3. DIAGNÓSTICO (2-3 msg): Muestra GAP. Guía a que identifiquen: publicidad=problema
-4. SOLUCIÓN: AHORA menciona Datapify
-5. PROOF: Caso de éxito similar
-6. CTA: "¿Agendamos 30 min?"
+2. DOLOR (2-4 msg): Detecta dolor específico, cuantifica, pregunta meta. SOLO 1 pregunta.
+3. DIAGNÓSTICO (2-3 msg): Muestra GAP. Guía a que identifiquen: publicidad=problema. SOLO 1 pregunta.
+4. SOLUCIÓN: AHORA menciona Datapify brevemente
+5. PROOF: Caso de éxito similar si preguntan
+6. CTA: "¿Te tinca si agendamos 30 min para ver cómo mejorar?" (NO enviar link aún, esperar confirmación)
 
 CRÍTICO:
 - 1ra pregunta SIEMPRE: "¿Tu sitio está en Shopify?"
 - NO Shopify → descalificar
 - <$3M/mes → "Vuelve cuando vendas más"
 - NO mencionar Datapify hasta identificar dolor
-- Termina SIEMPRE con 1 pregunta (max 15 palabras)
-- 2-3 líneas máx`;
+- SOLO 1 pregunta por mensaje (NUNCA 2 preguntas juntas)
+- 2 líneas máx (como WhatsApp real)
+- NO enviar link automáticamente, primero esperar que digan "sí" a agendar`;
   }
 
   /**
@@ -122,6 +123,23 @@ CRÍTICO:
         });
       });
 
+      // Agregar instrucciones críticas justo antes del mensaje del usuario
+      messages.push({
+        role: 'system',
+        content: `EJEMPLOS DE RESPUESTAS (aprende de esto):
+❌ MAL: "¿Cómo van tus ventas? ¿Cuánto están vendiendo?" → 2 preguntas
+✅ BIEN: "¿Cómo van tus ventas?" → 1 pregunta
+
+❌ MAL: "¿Te gustaría saber qué podría estar pasando con tu estrategia para volver a esos números?"
+✅ BIEN: "¿Quieres saber qué puede estar fallando?" → más corto
+
+CRÍTICO:
+- SOLO 1 pregunta por mensaje
+- Max 2 líneas
+- Lenguaje casual chileno
+- NO enviar link hasta que usuario confirme`,
+      });
+
       // Agregar mensaje actual del usuario
       messages.push({
         role: 'user',
@@ -138,7 +156,7 @@ CRÍTICO:
             model: 'gpt-4o-mini', // Modelo más económico y rápido
             messages: messages,
             temperature: 0.7,
-            max_tokens: 300, // Suficiente para 2-3 líneas en WhatsApp
+            max_tokens: 150, // Reducido para forzar respuestas cortas (2 líneas max)
             top_p: 0.95,
             frequency_penalty: 0.3, // Evita repeticiones
             presence_penalty: 0.3,  // Fomenta variedad
