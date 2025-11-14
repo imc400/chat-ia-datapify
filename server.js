@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const logger = require('./src/utils/logger');
 const webhookRoutes = require('./src/routes/webhook');
 const oauthRoutes = require('./src/routes/oauth');
+const analyticsRoutes = require('./src/routes/analytics');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 // Rutas
 app.use('/webhook', webhookRoutes);
 app.use('/oauth', oauthRoutes);
+app.use('/api/analytics', analyticsRoutes); // NUEVO: Dashboard de aprendizaje
 
 // Ruta de salud
 app.get('/health', (req, res) => {

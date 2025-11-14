@@ -1,17 +1,18 @@
 const whatsappService = require('../services/whatsappService');
-const aiService = require('../services/openaiService'); // Cambiado de geminiService a openaiService
+const aiService = require('../services/openaiService');
+const conversationService = require('../services/conversationService');
 const calendarService = require('../services/calendarService');
 const config = require('../config');
 const logger = require('../utils/logger');
 
-// Almacenamiento temporal de sesiones (en producción usar Redis o DB)
-const sessions = new Map();
-
 class MessageController {
   /**
    * Procesa un mensaje entrante de WhatsApp
+   * NUEVA VERSIÓN: Persiste TODO en base de datos para aprendizaje
    */
   async processMessage(message, metadata) {
+    const startTime = Date.now();
+
     try {
       const from = message.from;
       const messageId = message.id;
@@ -36,18 +37,18 @@ class MessageController {
         message: userMessage,
       });
 
-      // Obtener o crear sesión
-      const session = this.getSession(from);
+      // 1. OBTENER O CREAR CONVERSACIÓN (desde BD)
+      const conversation = await conversationService.getOrCreateConversation(from);
 
-      // Agregar mensaje al historial
-      session.history.push({
-        role: 'usuario',
-        content: userMessage,
-      });
+      // 2. GUARDAR MENSAJE DEL USUARIO
+      await conversationService.saveMessage(conversation.id, 'user', userMessage);
 
-      // Calificar el lead basado en la conversación
-      const leadScore = aiService.qualifyLead(session.history);
-      session.leadScore = leadScore;
+      // 3. OBTENER HISTORIAL DESDE BD (últimos 8 mensajes)
+      const history = await conversationService.getConversationHistory(conversation.id, 8);
+
+      // 4. CALIFICAR LEAD
+      const leadScore = aiService.qualifyLead(history);
+      await conversationService.updateLeadScore(conversation.id, leadScore);
 
       logger.info('🎯 Lead actualizado', {
         from,
@@ -56,45 +57,47 @@ class MessageController {
         phase: leadScore.phase,
       });
 
-      // Generar respuesta con OpenAI (con contexto del lead)
+      // 5. GENERAR RESPUESTA CON IA
       const aiResponse = await aiService.generateResponse(
         userMessage,
-        session.history.slice(-8), // Últimos 8 mensajes para mejor memoria (aumentado de 5)
+        history,
         leadScore
       );
 
-      // Limpiar respuesta
-      const cleanResponse = aiService.cleanResponse(aiResponse);
+      const responseTime = Date.now() - startTime;
 
-      // Agregar respuesta al historial
-      session.history.push({
-        role: 'asistente',
-        content: cleanResponse,
-        });
+      // 6. GUARDAR RESPUESTA DEL ASISTENTE EN BD
+      await conversationService.saveMessage(
+        conversation.id,
+        'assistant',
+        aiResponse,
+        null, // tokens (OpenAI no devuelve tokens en la respuesta)
+        responseTime
+      );
 
-      // Enviar respuesta del agente
-      await whatsappService.sendTextMessage(from, cleanResponse);
+      // 7. ENVIAR RESPUESTA AL USUARIO
+      await whatsappService.sendTextMessage(from, aiResponse);
 
-      // NUEVA LÓGICA: Solo enviar link cuando usuario CONFIRMA explícitamente
-      // Debe cumplir AMBAS condiciones:
-      // 1. El agente preguntó por agendar en su respuesta actual O en la anterior
-      // 2. El usuario confirma en su mensaje actual
-
-      const agentAskedToSchedule = cleanResponse.toLowerCase().includes('agend') ||
-                                   cleanResponse.toLowerCase().includes('reuni') ||
-                                   cleanResponse.toLowerCase().includes('llam') ||
-                                   (session.history.length >= 2 &&
-                                    session.history[session.history.length - 2].content.toLowerCase().includes('agend'));
+      // 8. LÓGICA DE AGENDAMIENTO
+      const agentAskedToSchedule = aiResponse.toLowerCase().includes('agend') ||
+                                   aiResponse.toLowerCase().includes('reuni') ||
+                                   aiResponse.toLowerCase().includes('llam');
 
       const userConfirms = this.userConfirmsScheduling(userMessage);
 
-      // Solo enviar link si el agente preguntó Y el usuario confirma
       if (agentAskedToSchedule && userConfirms) {
         await this.sendBookingLink(from);
+
+        // Marcar conversación como potencial agendamiento
+        await conversationService.completeConversation(
+          conversation.id,
+          'pending', // pending hasta que confirmemos que agendó
+          false
+        );
       }
 
-      // Actualizar última actividad
-      session.lastActivity = Date.now();
+      // 9. EXTRACCIÓN AUTOMÁTICA DE DATOS DEL LEAD
+      await this.extractAndSaveLeadData(conversation.id, history);
 
     } catch (error) {
       logger.error('Error procesando mensaje:', {
@@ -292,51 +295,78 @@ class MessageController {
   }
 
   /**
-   * Obtiene o crea una sesión de usuario
+   * Extrae y guarda automáticamente datos del lead desde la conversación
    */
-  getSession(phone) {
-    if (!sessions.has(phone)) {
-      sessions.set(phone, {
-        phone,
-        history: [],
-        leadScore: {
-          temperature: 'cold',
-          score: 0,
-          signals: [],
-          phase: 'APERTURA',
-        },
-        pendingIntent: null,
-        lastEvent: null,
-        lastActivity: Date.now(),
-        createdAt: Date.now(),
-      });
+  async extractAndSaveLeadData(conversationId, history) {
+    try {
+      const leadData = {};
+      const allText = history.map(h => h.content.toLowerCase()).join(' ');
 
-      logger.info('📝 Nueva sesión creada', { phone });
-    }
+      // Extraer nombre (buscar "me llamo", "soy", etc)
+      const namePatterns = [
+        /me llamo (\w+)/i,
+        /soy (\w+)/i,
+        /mi nombre es (\w+)/i,
+      ];
 
-    return sessions.get(phone);
-  }
-
-  /**
-   * Limpia sesiones antiguas (ejecutar periódicamente)
-   */
-  cleanOldSessions() {
-    const now = Date.now();
-    const maxAge = 24 * 60 * 60 * 1000; // 24 horas
-
-    for (const [phone, session] of sessions.entries()) {
-      if (now - session.lastActivity > maxAge) {
-        sessions.delete(phone);
-        logger.info('🧹 Sesión eliminada por inactividad', { phone });
+      for (const pattern of namePatterns) {
+        const match = allText.match(pattern);
+        if (match) {
+          leadData.name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+          break;
+        }
       }
+
+      // Detectar Shopify
+      if (allText.includes('shopify')) {
+        leadData.hasShopify = allText.includes('sí') || allText.includes('si') || allText.includes('tengo shopify');
+      }
+
+      // Detectar inversión en publicidad
+      if (allText.includes('publicidad') || allText.includes('ads') || allText.includes('anuncios')) {
+        leadData.investsInAds = true;
+      }
+
+      // Extraer tipo de negocio
+      const businessPatterns = [
+        /vendo (\w+)/i,
+        /tienda de (\w+)/i,
+        /negocio de (\w+)/i,
+      ];
+
+      for (const pattern of businessPatterns) {
+        const match = allText.match(pattern);
+        if (match) {
+          leadData.businessType = match[1];
+          break;
+        }
+      }
+
+      // Extraer ventas mensuales (millones, palos, clp)
+      const revenuePatterns = [
+        /(\d+)\s*millones/i,
+        /(\d+)\s*palos/i,
+        /(\d+)\s*clp/i,
+      ];
+
+      for (const pattern of revenuePatterns) {
+        const match = allText.match(pattern);
+        if (match) {
+          const amount = parseInt(match[1]) * 1000000; // Convertir a CLP
+          leadData.monthlyRevenueCLP = BigInt(amount);
+          break;
+        }
+      }
+
+      // Solo guardar si hay datos para actualizar
+      if (Object.keys(leadData).length > 0) {
+        await conversationService.updateLeadData(conversationId, leadData);
+      }
+    } catch (error) {
+      logger.error('Error extrayendo datos del lead:', error);
+      // No lanzar error para no interrumpir el flujo
     }
   }
 }
-
-// Limpiar sesiones cada hora
-setInterval(() => {
-  const controller = new MessageController();
-  controller.cleanOldSessions();
-}, 60 * 60 * 1000);
 
 module.exports = new MessageController();

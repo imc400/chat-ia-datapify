@@ -48,3 +48,5 @@ coverage/
 
 # Otros
 .cache/
+
+/src/generated/prisma

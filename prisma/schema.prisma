@@ -1,0 +1,148 @@
+// Schema para IA que aprende de conversaciones
+// Sistema de aprendizaje continuo para Datapify WhatsApp Bot
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// CONVERSACIONES Y MENSAJES
+// ========================================
+
+model Conversation {
+  id                String   @id @default(uuid())
+  phone             String   // WhatsApp del usuario
+  startedAt         DateTime @default(now())
+  endedAt           DateTime?
+  status            String   @default("active") // 'active', 'completed', 'abandoned'
+  outcome           String?  // 'scheduled', 'disqualified', 'abandoned', 'pending'
+  leadTemperature   String   @default("cold") // 'hot', 'warm', 'cold'
+  leadScore         Int      @default(0) // 0-10
+  scheduledMeeting  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relaciones
+  messages          Message[]
+  leadData          LeadData?
+  analytics         ConversationAnalytics?
+
+  @@index([phone])
+  @@index([createdAt])
+  @@index([outcome])
+  @@index([leadTemperature])
+}
+
+model Message {
+  id              String   @id @default(uuid())
+  conversationId  String
+  role            String   // 'user' o 'assistant'
+  content         String   @db.Text
+  tokensUsed      Int?
+  responseTimeMs  Int?
+  timestamp       DateTime @default(now())
+
+  // Relaciones
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([timestamp])
+}
+
+// ========================================
+// DATOS DEL LEAD (Extracción automática)
+// ========================================
+
+model LeadData {
+  id                    String   @id @default(uuid())
+  conversationId        String   @unique
+  name                  String?
+  businessType          String?
+  hasShopify            Boolean?
+  monthlyRevenueCLP     BigInt?
+  investsInAds          Boolean?
+  adSpendMonthlyCLP     BigInt?
+  location              String?
+  painPoints            Json?    // Array de dolores identificados
+  qualificationSignals  Json?    // Señales detectadas
+  extractedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relaciones
+  conversation          Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([hasShopify])
+  @@index([monthlyRevenueCLP])
+}
+
+// ========================================
+// ANALYTICS DE CADA CONVERSACIÓN
+// ========================================
+
+model ConversationAnalytics {
+  id                    String   @id @default(uuid())
+  conversationId        String   @unique
+  totalMessages         Int      @default(0)
+  userMessages          Int      @default(0)
+  assistantMessages     Int      @default(0)
+  avgResponseTimeMs     Int?
+  nameUsedCount         Int      @default(0) // Cuántas veces usó el nombre
+  chileanWordsCount     Int      @default(0) // Cuántas palabras chilenas
+  rapportMoments        Int      @default(0) // Cuántas veces hizo rapport
+  questionsAsked        Int      @default(0)
+  conversionRateScore   Float?   // 0.0-1.0 probabilidad de conversión
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relaciones
+  conversation          Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([conversionRateScore])
+}
+
+// ========================================
+// SISTEMA DE APRENDIZAJE
+// ========================================
+
+model LearningInsight {
+  id                    String   @id @default(uuid())
+  insightType           String   // 'successful_phrase', 'failed_phrase', 'timing', 'rapport_technique'
+  pattern               String   @db.Text
+  confidence            Float    @default(0.0) // 0.0-1.0
+  sampleConversations   Json     // Array de conversation IDs
+  impactScore           Float?   // Qué tanto mejora la conversión
+  discoveredAt          DateTime @default(now())
+  appliedToPrompt       Boolean  @default(false)
+
+  @@index([insightType])
+  @@index([confidence])
+  @@index([appliedToPrompt])
+}
+
+// ========================================
+// HISTORIAL DE PROMPTS Y SU PERFORMANCE
+// ========================================
+
+model PromptVersion {
+  id                String   @id @default(uuid())
+  version           String   @unique // 'v1.0', 'v1.1', etc
+  promptText        String   @db.Text
+  activeFrom        DateTime @default(now())
+  activeUntil       DateTime?
+  conversationsCount Int     @default(0)
+  conversionRate    Float?   // % de conversaciones que terminan en agendamiento
+  avgLeadScore      Float?
+  createdBy         String   // 'manual' o 'ai_learning'
+  createdAt         DateTime @default(now())
+
+  @@index([version])
+  @@index([activeFrom])
+  @@index([conversionRate])
+}
