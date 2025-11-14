@@ -157,10 +157,15 @@ IMPORTANTE:
         role: 'system',
         content: `EJEMPLOS DE CONVERSACIÓN NATURAL:
 
-EJEMPLO 1 - SALUDO:
+EJEMPLO 1A - SALUDO CON PREGUNTA:
 Usuario: "Hola, cómo estás?"
 ❌ MAL: "¿Tu sitio está en Shopify?"
-✅ BIEN: "Todo bien, gracias. ¿Y tú?"
+✅ BIEN: "Todo bien, gracias. ¿Y tú? ¿Cómo te llamas?"
+
+EJEMPLO 1B - SALUDO SIN PREGUNTA:
+Usuario: "Hola, me gustaría tener más información"
+❌ MAL: "Todo bien, gracias. ¿Y tú?"  ← NO preguntó cómo estás
+✅ BIEN: "Hola! Claro, con gusto. ¿Cómo te llamas?"
 
 EJEMPLO 2 - NOMBRE PRIMERO:
 Usuario: "Bien! quería info"
@@ -190,6 +195,8 @@ Usuario: "No sé qué hacer"
 ✅ BIEN: "Entiendo. ¿Has probado cambiar algo en tus anuncios?" ← Usa la info que ya tienes
 
 CRÍTICO:
+- LEE EL CONTEXTO: Si dicen "hola, quiero info" NO respondas "todo bien, gracias" (no preguntaron)
+- RESPONDE A LO QUE DICEN: No apliques patrones ciegamente
 - LEE EL HISTORIAL antes de responder
 - NO preguntes lo que YA te dijeron
 - USA el nombre si ya lo sabes
