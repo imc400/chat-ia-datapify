@@ -81,11 +81,20 @@ class MessageController {
       // 8. LÓGICA DE AGENDAMIENTO
       const agentAskedToSchedule = aiResponse.toLowerCase().includes('agend') ||
                                    aiResponse.toLowerCase().includes('reuni') ||
-                                   aiResponse.toLowerCase().includes('llam');
+                                   aiResponse.toLowerCase().includes('llam') ||
+                                   aiResponse.toLowerCase().includes('link para agendar') ||
+                                   aiResponse.toLowerCase().includes('te paso el link') ||
+                                   aiResponse.toLowerCase().includes('enviar') && aiResponse.toLowerCase().includes('link');
 
       const userConfirms = this.userConfirmsScheduling(userMessage);
 
-      if (agentAskedToSchedule && userConfirms) {
+      // NUEVO: También enviar si la IA dice que va a pasar el link
+      const agentConfirmedLink = aiResponse.toLowerCase().includes('te paso el link') ||
+                                 aiResponse.toLowerCase().includes('te envío el link') ||
+                                 aiResponse.toLowerCase().includes('te enviaré el link') ||
+                                 (aiResponse.toLowerCase().includes('perfecto') && aiResponse.toLowerCase().includes('link'));
+
+      if ((agentAskedToSchedule && userConfirms) || agentConfirmedLink) {
         await this.sendBookingLink(from);
 
         // Marcar conversación como potencial agendamiento
