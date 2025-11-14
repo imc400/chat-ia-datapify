@@ -25,7 +25,7 @@ class OrchestrationService {
       maxQuestions: 2,
     };
 
-    // Palabras bloqueadas (spam, vendedor, robot)
+    // Palabras bloqueadas (spam, vendedor, robot, corporativo)
     this.blockedPhrases = [
       'espero haberte ayudado',
       'estoy aquí para ayudarte',
@@ -33,6 +33,16 @@ class OrchestrationService {
       'es un placer ayudarte',
       'no dudes en contactarme',
       'para servirte',
+      'encantado de ayudarte',
+      'si te parece',
+      '¿te vendría bien?',
+      'genial, agendemos entonces',
+      'puede ser competitivo',
+      'es clave',
+      'bien optimizada',
+      'fácilmente',
+      'gustosamente',
+      'con gusto',
     ];
   }
 
