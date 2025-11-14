@@ -7,24 +7,32 @@ const logger = require('../utils/logger');
  */
 class OrchestrationService {
   constructor() {
-    // Configuración de reglas conversacionales
+    // Configuración de reglas conversacionales (OPTIMIZADAS - más flexible)
     this.rules = {
-      maxTokensPerResponse: 120, // Mensajes cortos para WhatsApp
-      maxHistoryMessages: 6, // Solo últimos 6 mensajes relevantes
-      maxQuestions: 1, // Máximo 1 pregunta por mensaje
-      maxLines: 3, // Máximo 3 líneas
-      maxCharacters: 250, // Máximo 250 caracteres
+      maxTokensPerResponse: 150, // Más espacio para naturalidad
+      maxHistoryMessages: 10, // Contexto más rico (últimos 10 mensajes)
+      maxQuestions: 2, // Hasta 2 preguntas si tiene sentido (ej: nombre y plataforma)
+      maxLines: 5, // Hasta 5 líneas para respuestas sustanciales
+      maxCharacters: 400, // 400 caracteres (más natural, menos telegráfico)
       maxRetries: 2, // Reintentos si respuesta no cumple reglas
-      responseTimeout: 10000, // 10 segundos max para generar
+      responseTimeout: 15000, // 15 segundos (modelo más creativo)
+    };
+
+    // Reglas FLEX para fases críticas (HOT LEAD o PROPUESTA)
+    this.flexRules = {
+      maxCharacters: 500, // Más espacio en momento de cierre
+      maxLines: 6,
+      maxQuestions: 2,
     };
 
     // Palabras bloqueadas (spam, vendedor, robot)
     this.blockedPhrases = [
       'espero haberte ayudado',
       'estoy aquí para ayudarte',
-      '¿hay algo más',
-      'es un placer',
-      'no dudes en',
+      '¿hay algo más en lo que pueda',
+      'es un placer ayudarte',
+      'no dudes en contactarme',
+      'para servirte',
     ];
   }
 
@@ -55,30 +63,39 @@ class OrchestrationService {
   }
 
   /**
-   * Valida si una respuesta cumple con las reglas
+   * Valida si una respuesta cumple con las reglas (OPTIMIZADO - contexto-aware)
+   * @param {string} response - Respuesta a validar
+   * @param {object} context - Contexto conversacional (fase, etc)
    */
-  validateResponse(response) {
+  validateResponse(response, context = {}) {
     const errors = [];
     const warnings = [];
 
-    // Validar longitud
-    if (response.length > this.rules.maxCharacters) {
-      errors.push(`Respuesta muy larga: ${response.length} caracteres (máx ${this.rules.maxCharacters})`);
+    // Elegir reglas según contexto (flex para HOT LEAD o PROPUESTA)
+    const isFlexPhase = context.phase === 'PROPUESTA' ||
+                        context.phase === 'CIERRE' ||
+                        context.interventionMoment === true;
+
+    const activeRules = isFlexPhase ? this.flexRules : this.rules;
+
+    // Validar longitud (más permisivo)
+    if (response.length > activeRules.maxCharacters) {
+      errors.push(`Respuesta muy larga: ${response.length} caracteres (máx ${activeRules.maxCharacters})`);
     }
 
-    // Validar líneas
+    // Validar líneas (más permisivo)
     const lines = response.split('\n').filter(l => l.trim().length > 0);
-    if (lines.length > this.rules.maxLines) {
-      errors.push(`Demasiadas líneas: ${lines.length} (máx ${this.rules.maxLines})`);
+    if (lines.length > activeRules.maxLines) {
+      errors.push(`Demasiadas líneas: ${lines.length} (máx ${activeRules.maxLines})`);
     }
 
-    // Validar preguntas
+    // Validar preguntas (permitir 2 en fases tempranas)
     const questionMarks = (response.match(/\?/g) || []).length;
-    if (questionMarks > this.rules.maxQuestions) {
-      errors.push(`Demasiadas preguntas: ${questionMarks} (máx ${this.rules.maxQuestions})`);
+    if (questionMarks > activeRules.maxQuestions) {
+      errors.push(`Demasiadas preguntas: ${questionMarks} (máx ${activeRules.maxQuestions})`);
     }
 
-    // Validar frases bloqueadas (suena a bot)
+    // Validar frases bloqueadas (solo WARNING, no bloquear)
     this.blockedPhrases.forEach(phrase => {
       if (response.toLowerCase().includes(phrase)) {
         warnings.push(`Frase robótica detectada: "${phrase}"`);
@@ -90,9 +107,9 @@ class OrchestrationService {
       errors.push('Respuesta vacía');
     }
 
-    // Validar que no tenga solo emojis
+    // Validar que no tenga solo emojis (más permisivo: mín 5 caracteres)
     const textWithoutEmojis = response.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
-    if (textWithoutEmojis.length < 10) {
+    if (textWithoutEmojis.length < 5) {
       errors.push('Respuesta solo tiene emojis o muy poco texto');
     }
 
@@ -101,6 +118,7 @@ class OrchestrationService {
       errors,
       warnings,
       response,
+      rulesUsed: isFlexPhase ? 'flex' : 'normal',
     };
   }
 
@@ -211,20 +229,30 @@ class OrchestrationService {
   }
 
   /**
-   * Construye el contexto completo para el LLM
+   * Construye el contexto completo para el LLM (OPTIMIZADO)
+   * Reglas dinámicas según fase conversacional
    */
-  buildContext(userMessage, history, dynamicInstructions, sentiment) {
+  buildContext(userMessage, history, dynamicInstructions, sentiment, conversationState = {}) {
+    // Determinar si usar reglas flex
+    const isFlexPhase = conversationState.phase === 'PROPUESTA' ||
+                        conversationState.phase === 'CIERRE' ||
+                        conversationState.interventionMoment === true;
+
+    const activeRules = isFlexPhase ? this.flexRules : this.rules;
+
     return {
       cleanedMessage: this.cleanUserMessage(userMessage),
       preparedHistory: this.prepareHistory(history),
       dynamicInstructions: dynamicInstructions,
       sentimentInstructions: this.getSentimentInstructions(sentiment),
       rules: {
-        maxLength: `Máximo ${this.rules.maxCharacters} caracteres`,
-        maxQuestions: `Máximo ${this.rules.maxQuestions} pregunta`,
-        maxLines: `Máximo ${this.rules.maxLines} líneas`,
-        style: 'Natural, humano, conversacional',
+        maxLength: `Máximo ${activeRules.maxCharacters} caracteres`,
+        maxQuestions: `Máximo ${activeRules.maxQuestions} preguntas`,
+        maxLines: `Máximo ${activeRules.maxLines} líneas`,
+        style: 'Natural, conversacional, humano (NO robótico)',
       },
+      phase: conversationState.phase || 'APERTURA',
+      isFlexPhase,
     };
   }
 

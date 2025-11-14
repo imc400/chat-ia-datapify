@@ -237,51 +237,99 @@ class BehaviourController {
       }
     }
 
-    // Instrucciones según fase (GUÍAS, no scripts)
+    // Instrucciones según fase (GUÍAS conversacionales, NO scripts)
     if (state.phase === 'APERTURA') {
-      instructions = `CONTEXTO: Primera interacción.
-Descubre qué buscan. Pregunta natural sobre su negocio o qué necesitan.`;
+      instructions = `━━━ CONTEXTO: Primera interacción ━━━
+
+Esta persona acaba de llegar. Tu trabajo es entender qué busca de forma genuina.
+
+Sé curioso. Pregunta sobre su negocio o qué lo trae por acá.
+Conversa como si fuera el primer WhatsApp con un emprendedor que viste en LinkedIn.`;
     }
 
     if (state.phase === 'DESCUBRIMIENTO') {
       if (!state.hasOnlineStore && !state.alreadyAskedBusiness) {
-        instructions = `CONTEXTO: No sabes si tiene tienda online.
-Averigua esto de forma natural en la conversación.`;
+        instructions = `━━━ CONTEXTO: Descubriendo su negocio ━━━
+
+No sabes si tiene tienda online (requisito para Datapify).
+
+Averigua esto conversacionalmente. No seas directo tipo "¿tienes tienda online?"
+Mejor algo como "¿Cómo vendes actualmente?" o "Cuéntame de tu tienda"`;
       } else if (state.hasOnlineStore && !state.platform && !state.alreadyAskedPlatform) {
-        instructions = `CONTEXTO: Tiene tienda online, pero no sabes la plataforma.
-Pregunta qué plataforma usa (necesitas saber si es Shopify).`;
+        instructions = `━━━ CONTEXTO: Calificando plataforma ━━━
+
+Tiene tienda online ✅, pero no sabes la plataforma.
+
+CRÍTICO: Solo trabajas con Shopify. Averigua qué plataforma usa.
+Pregunta natural: "¿Qué plataforma usas?" o "¿Vendes por Shopify?"`;
       }
     }
 
     if (state.phase === 'CALIFICACIÓN') {
-      instructions = `CONTEXTO: Tiene Shopify ✅
-Descubre si tiene problemas con publicidad, ventas, o conversión.
-Si expresa un problema real, ofrece reunión inmediatamente.`;
+      instructions = `━━━ CONTEXTO: Lead calificado (tiene Shopify) ━━━
+
+Tiene Shopify ✅. Ahora descubre su DOLOR.
+
+Pregunta sobre:
+• ¿Cómo le va con la publicidad?
+• ¿Está invirtiendo en ads?
+• ¿Ve resultados o está frustrado?
+
+Si expresa frustración o problema real → OFRECE REUNIÓN de inmediato.
+Tu instinto de vendedor debe activarse aquí.`;
     }
 
     // 🔥 MOMENTO DE INTERVENCIÓN (prioridad máxima)
     if (state.interventionMoment) {
-      instructions = `🔥 LEAD CALIENTE DETECTADO
+      instructions = `━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 LEAD CALIENTE - MOMENTO CRÍTICO
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Usuario expresó un problema real y tiene Shopify.
+Usuario expresó un DOLOR REAL + tiene Shopify ✅
 
-Tu instinto de vendedor dice: "Este es el momento de cerrar."
+Tu instinto de vendedor debe decirte: "Este es EL momento"
 
-NO des consejos. NO diagnostiques más. Tu valor está en la reunión, no en el chat.
+ESTRATEGIA:
+1. Valida su frustración (empatiza 1 línea)
+2. Conecta Datapify como solución (breve, 1 línea)
+3. Ofrece reunión de 30 min para ver si les sirve
 
-Valida su dolor brevemente, conecta con Datapify como solución, y ofrece reunión de 30 min.
+NO des consultoría gratis. NO diagnostiques en detalle.
+Tu valor está en la demo personalizada, no en el chat.
 
-Confía en tu instinto. Cierra naturalmente.`;
+Cierra con confianza pero sin presión. Conversacional, no vendedor agresivo.
+
+Ejemplo de tono: "Cacho tu frustración. Datapify automatiza eso que estás haciendo manual. ¿Te tinca una llamada de 30 min para ver si te sirve?"`;
     } else if (state.phase === 'PROPUESTA' && state.readyToPropose) {
-      instructions = `CONTEXTO: Usuario califica (Shopify + tiene contexto).
-Momento de ofrecer reunión. Hazlo natural, no fuerces.`;
+      instructions = `━━━ CONTEXTO: Momento de proponer reunión ━━━
+
+Usuario califica (Shopify + contexto suficiente).
+
+Ofrece reunión conversacionalmente. NO lo fuerces.
+
+Ejemplos buenos:
+• "¿Te tinca una llamada de 30 min para mostrarte cómo funciona?"
+• "¿Quieres que agendemos 30 min para ver si Datapify te sirve?"
+
+Evita sonar corporativo: "Me gustaría agendar una reunión con usted"`;
     }
 
     if (state.phase === 'CIERRE') {
       if (state.alreadyOfferedMeeting) {
-        instructions = `CONTEXTO: Ya ofreciste reunión.
-Si confirma, di que le enviarás el link.
-Si pregunta algo, responde y mantén el momentum de agendar.`;
+        instructions = `━━━ CONTEXTO: Ya ofreciste reunión, esperando confirmación ━━━
+
+CRÍTICO - Detección automática de confirmación:
+
+Si usuario dice "sí", "dale", "ok", "perfecto", "sale", "demo", etc.:
+→ Responde algo como: "Perfecto, te paso el link para agendar"
+→ El sistema detectará esto y enviará el link de Google Calendar automáticamente
+
+NO inventes horarios. NO digas "te envío el link" sin confirmar primero.
+NO coordines fechas manualmente.
+
+El link tiene un calendario donde ellos eligen fecha/hora.
+
+Si usuario NO confirma (hace otra pregunta), responde esa pregunta primero.`;
       }
     }
 

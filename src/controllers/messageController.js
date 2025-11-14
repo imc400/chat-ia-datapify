@@ -43,8 +43,8 @@ class MessageController {
       // 2. GUARDAR MENSAJE DEL USUARIO
       await conversationService.saveMessage(conversation.id, 'user', userMessage);
 
-      // 3. OBTENER HISTORIAL DESDE BD (últimos 8 mensajes)
-      const history = await conversationService.getConversationHistory(conversation.id, 8);
+      // 3. OBTENER HISTORIAL DESDE BD (últimos 10 mensajes - contexto más rico)
+      const history = await conversationService.getConversationHistory(conversation.id, 10);
 
       // 4. CALIFICAR LEAD
       const leadScore = aiService.qualifyLead(history);
@@ -128,26 +128,61 @@ class MessageController {
   }
 
   /**
-   * Verifica si el usuario está confirmando que quiere agendar
-   * Más estricto: solo palabras de confirmación clara
+   * Verifica si el usuario está confirmando que quiere agendar (OPTIMIZADO)
+   * Más inteligente: detecta confirmación en diferentes contextos
    */
   userConfirmsScheduling(userMessage) {
     const confirmationKeywords = [
-      'si', 'sí', 'dale', 'ok', 'okay', 'ya', 'claro', 'seguro',
-      'perfecto', 'bueno', 'genial', 'demás', 'sale', 'obvio',
-      'bakán', 'agendemos', 'agendamos', 'agendo', 'me tinca'
+      // Confirmación directa
+      'si', 'sí', 'sii', 'síi',
+      'dale', 'ok', 'okay', 'oki', 'okey',
+      'ya', 'claro', 'seguro', 'obvio',
+      'perfecto', 'bueno', 'genial', 'excelente',
+      'demás', 'sale', 'dale', 'va',
+      'bakán', 'bacán', 'bakan',
+
+      // Confirmación con acción
+      'agend', // captura agendemos, agendamos, agendo, agendar
+      'me tinca', 'tinca', 'me interesa',
+      'coordinemos', 'hablemos', 'llamemos',
+      'sí quiero', 'si quiero', 'quiero',
+      'vamos', 'hagámoslo', 'hagamos',
+
+      // Confirmación entusiasta
+      'por supuesto', 'desde luego', 'sin duda',
+      'adelante', 'tiremos',
     ];
 
     const userLower = userMessage.toLowerCase().trim();
 
-    // Verificar si el mensaje del usuario contiene confirmación
-    return confirmationKeywords.some(kw => {
-      // Mensaje completo es solo la keyword (ej: "si", "dale")
-      if (userLower === kw) return true;
-      // O contiene la keyword con espacio (para evitar falsos positivos)
-      if (userLower.includes(` ${kw} `) || userLower.startsWith(`${kw} `) || userLower.endsWith(` ${kw}`)) return true;
-      return false;
-    });
+    // 1. Mensaje completo es solo la keyword
+    if (confirmationKeywords.some(kw => userLower === kw)) {
+      return true;
+    }
+
+    // 2. Contiene keyword con contexto (espacios alrededor)
+    if (confirmationKeywords.some(kw => {
+      return userLower.includes(` ${kw} `) ||
+             userLower.startsWith(`${kw} `) ||
+             userLower.endsWith(` ${kw}`) ||
+             userLower === kw;
+    })) {
+      return true;
+    }
+
+    // 3. Frases específicas de confirmación de reunión
+    const confirmationPhrases = [
+      'sí, agend', 'si agend', 'dale, agend',
+      'quiero la reuni', 'quiero agendar',
+      'dame el link', 'pásame el link', 'envíame el link',
+      'me interesa la reuni', 'me interesa agendar',
+    ];
+
+    if (confirmationPhrases.some(phrase => userLower.includes(phrase))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

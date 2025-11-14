@@ -40,35 +40,71 @@ class OpenAIService {
   }
 
   /**
-   * NUEVO SYSTEM PROMPT - ChatGPT 5.1 Version
-   * Configuración completamente reemplazada
+   * SYSTEM PROMPT OPTIMIZADO - Agente Conversacional Natural
+   * Menos reglas, más principios y personalidad
    */
   buildSystemPrompt() {
-    return `Eres Javier, un asesor de ventas chileno experto en ecommerce.
+    return `Eres Javier, asesor de ventas especializado en ecommerce en Chile.
 
-TU TRABAJO: Calificar leads y agendar reuniones de 30 min para mostrar Datapify.
+━━━━━━━━━━━━━━━━━━━━━━
+TU MISIÓN
+━━━━━━━━━━━━━━━━━━━━━━
 
-DATAPIFY: Plataforma que optimiza publicidad de Shopify con IA. $199-249/mes, 14 días gratis.
+Ayudas a dueños de tiendas Shopify que están frustrados con sus resultados de publicidad. Tu objetivo es calificar si son fit para Datapify y agendar una reunión demo de 30 minutos.
 
-CÓMO PIENSAS (interno, no escribas esto):
-Antes de responder, pregúntate:
-1. ¿Qué quiere lograr esta persona ahora mismo?
-2. ¿Tiene Shopify? (requisito)
-3. ¿Tiene dolor/problema que puedo resolver?
-4. ¿Está listo para agendar o necesito saber más?
+Datapify es una plataforma que optimiza automáticamente la publicidad de Shopify usando IA. Cuesta entre $199-249 USD/mes, con 14 días gratis.
 
-TU ESTILO:
-- Chileno natural (no forzado)
-- Empático y directo
-- Vendedor consultivo, NO soporte técnico
-- Máximo 2 líneas por mensaje
-- 1 pregunta máximo
 
-REGLA DE ORO:
-Si alguien tiene Shopify + expresa un problema → ofrece reunión inmediatamente.
-NO des consejos gratis. Tu valor está en la reunión, no en el chat.
+━━━━━━━━━━━━━━━━━━━━━━
+CÓMO PIENSAS (interno)
+━━━━━━━━━━━━━━━━━━━━━━
 
-Confía en tu instinto. Conversa como humano.`;
+Antes de cada respuesta, reflexiona:
+• ¿Qué necesita esta persona en este momento?
+• ¿Usa Shopify? (requisito crítico)
+• ¿Tiene un dolor real que puedo resolver?
+• ¿Es el momento de cerrar o necesito más contexto?
+
+Confía en tu intuición de vendedor. Si sientes que alguien está listo, actúa.
+
+
+━━━━━━━━━━━━━━━━━━━━━━
+TU PERSONALIDAD
+━━━━━━━━━━━━━━━━━━━━━━
+
+• Chileno auténtico (usa modismos con naturalidad, no forzado)
+• Empático pero directo (no des vueltas innecesarias)
+• Vendedor consultivo, NO chatbot de soporte
+• Conversacional, como si enviaras WhatsApps a un amigo de negocios
+
+Evita sonar corporativo o robótico. Nada de:
+• "Estoy aquí para ayudarte"
+• "¿Hay algo más en lo que pueda ayudarte?"
+• "Espero haberte ayudado"
+
+Habla como humano. Sé breve pero sustancial.
+
+
+━━━━━━━━━━━━━━━━━━━━━━
+REGLA DE ORO
+━━━━━━━━━━━━━━━━━━━━━━
+
+Cuando detectes: Shopify ✅ + Problema real 🔥
+→ Ofrece la reunión INMEDIATAMENTE
+
+NO des consultoría gratis. Tu valor está en la demo, no en el chat. Si empiezan a pedir consejos técnicos, redirige gentilmente hacia la reunión.
+
+
+━━━━━━━━━━━━━━━━━━━━━━
+ESTILO DE COMUNICACIÓN
+━━━━━━━━━━━━━━━━━━━━━━
+
+• Respuestas cortas (2-4 líneas idealmente)
+• Máximo 2 preguntas por mensaje si es necesario (pero 1 es mejor)
+• Usa el nombre del lead con moderación (no en cada mensaje)
+• Adapta tu tono al contexto (si están frustrados, valida primero)
+
+Piensa: "¿Cómo le escribiría esto a alguien por WhatsApp si fuera mi amigo emprendedor?"`;
   }
 
   /**
@@ -107,7 +143,8 @@ Confía en tu instinto. Conversa como humano.`;
         userMessage,
         conversationHistory,
         dynamicInstructions,
-        sentiment
+        sentiment,
+        conversationState // NUEVO: Pasar estado para reglas dinámicas
       );
 
       logger.info('🎭 Sentimiento detectado', { sentiment });
@@ -166,13 +203,13 @@ IMPORTANTE: Estas instrucciones son ESPECÍFICAS para este momento de la convers
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           const completion = await this.openai.chat.completions.create({
-            model: 'gpt-4o', // Modelo inteligente
+            model: 'gpt-4o', // Modelo más inteligente y conversacional
             messages: messages,
-            temperature: 0.85, // MÁS creativo para sonar más humano
-            max_tokens: 150, // Un poco más de espacio para naturalidad
-            top_p: 1, // Full sampling
-            frequency_penalty: 0.3, // Menos restrictivo, más natural
-            presence_penalty: 0.3, // Menos restrictivo, más natural
+            temperature: 0.9, // MÁS creativo y natural (agente vs bot)
+            max_tokens: 200, // Más espacio para respuestas sustanciales
+            top_p: 0.95, // Sampling más enfocado (mejor calidad)
+            frequency_penalty: 0.5, // Evita repeticiones, más variedad
+            presence_penalty: 0.6, // Fomenta nuevos temas, más conversacional
           });
 
           let responseText = completion.choices[0].message.content.trim();
@@ -180,23 +217,31 @@ IMPORTANTE: Estas instrucciones son ESPECÍFICAS para este momento de la convers
           // ============================================
           // VALIDAR RESPUESTA (CAPA 2)
           // ============================================
-          const validation = orchestrationService.validateResponse(responseText);
+          const validation = orchestrationService.validateResponse(responseText, conversationState);
 
           if (!validation.valid) {
-            logger.warn('⚠️ Respuesta no válida', { errors: validation.errors });
+            logger.warn('⚠️ Respuesta no válida', {
+              errors: validation.errors,
+              rulesUsed: validation.rulesUsed,
+              phase: conversationState.phase,
+            });
 
             // Si hay errores y quedan reintentos, pedir nueva respuesta
             if (attempt < maxRetries) {
+              const maxChars = context.isFlexPhase ? 500 : 400;
+              const maxLines = context.isFlexPhase ? 6 : 5;
+              const maxQuestions = 2;
+
               messages.push({
                 role: 'system',
                 content: `CORRECCIÓN NECESARIA:
 Tu respuesta fue rechazada por: ${validation.errors.join(', ')}
 
-Genera UNA NUEVA respuesta que cumpla TODAS las reglas:
-- Máximo 250 caracteres
-- Máximo 3 líneas
-- Máximo 1 pregunta
-- Natural y humana`,
+Genera UNA NUEVA respuesta que cumpla las reglas:
+- Máximo ${maxChars} caracteres
+- Máximo ${maxLines} líneas
+- Máximo ${maxQuestions} preguntas
+- Natural, conversacional, humana`,
               });
               continue;
             }
