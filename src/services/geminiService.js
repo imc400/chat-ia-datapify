@@ -241,26 +241,57 @@ Zona: ${bk.business_hours.timezone}
       prompt += `## TU RESPUESTA\n`;
       prompt += `(Según la fase actual de la conversación):`;
 
-      const result = await this.model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.8, // Más alto para respuestas más naturales
-          maxOutputTokens: 2048,
-          topP: 0.95,
-          topK: 40,
-        },
-      });
+      // Reintentos automáticos para manejar sobrecarga (503)
+      const maxRetries = 3;
+      let lastError;
 
-      const response = result.response;
-      const responseText = response.text();
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await this.model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.8,
+              maxOutputTokens: 2048,
+              topP: 0.95,
+              topK: 40,
+            },
+          });
 
-      logger.info('✅ Respuesta generada por Gemini', {
-        inputLength: userMessage.length,
-        outputLength: responseText.length,
-        leadTemp: leadScore?.temperature || 'unknown',
-      });
+          const response = result.response;
+          const responseText = response.text();
 
-      return responseText;
+          if (attempt > 1) {
+            logger.info(`✅ Intento ${attempt} exitoso después de error 503`);
+          }
+
+          logger.info('✅ Respuesta generada por Gemini', {
+            inputLength: userMessage.length,
+            outputLength: responseText.length,
+            leadTemp: leadScore?.temperature || 'unknown',
+            attempt,
+          });
+
+          return responseText;
+        } catch (error) {
+          lastError = error;
+
+          // Solo reintentar si es error 503 (sobrecarga)
+          if (error.message?.includes('503') || error.message?.includes('overloaded')) {
+            if (attempt < maxRetries) {
+              const waitTime = attempt * 1000; // 1s, 2s, 3s
+              logger.warn(`⚠️ Modelo sobrecargado. Reintentando en ${waitTime}ms (intento ${attempt + 1}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue;
+            }
+          }
+
+          // Si no es 503 o ya agotamos reintentos, lanzar error
+          throw error;
+        }
+      }
+
+      // Si llegamos aquí, agotamos los reintentos
+      throw lastError;
     } catch (error) {
       logger.error('Error generando respuesta con Gemini:', {
         message: error.message,
