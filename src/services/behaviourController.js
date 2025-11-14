@@ -60,15 +60,24 @@ class BehaviourController {
       'no puedo',
       'no estoy viendo resultados',
       'no tengo resultados',
+      'no compran', // NUEVO
+      'no me compran', // NUEVO
+      'no están comprando', // NUEVO
 
       // Admisión de fracaso
       'estoy invirtiendo y',
       'estoy gastando',
+      'invierto en publicidad', // NUEVO
+      'invierto en ads', // NUEVO
+      'invierto pero', // NUEVO
+      'invirtiendo pero', // NUEVO
       'mis ventas están',
       'mis ads no',
       'mi publicidad no',
       'nada me funciona',
       'he probado todo',
+      'no sé', // NUEVO - señal de confusión = necesita ayuda
+      'no lo sé', // NUEVO
 
       // Intención explícita
       'vi su anuncio',
@@ -77,6 +86,7 @@ class BehaviourController {
       'me gustaría que me ayuden',
       'pueden ayudarme',
       'necesito que me ayuden',
+      'me gustaría más información', // NUEVO
 
       // Urgencia
       'lo antes posible',
@@ -171,21 +181,23 @@ class BehaviourController {
     // 🔥 MOMENTO DE INTERVENCIÓN
     // Si detecta HOT LEAD + mínimo contexto → saltar a PROPUESTA inmediata
     if (state.hotLeadSignals) {
-      // Condiciones para intervención inmediata:
-      // 1. Tiene señales HOT
-      // 2. Ya sabemos que tiene tienda online o mencionó ecommerce/shopify
-      // 3. Mencionó publicidad/ads o problemas de ventas
+      // Condiciones PERMISIVAS para intervención:
+      // Solo necesita: Señales HOT + (Shopify confirmado O tiene tienda O mencionó ecommerce)
 
-      const hasMinimalContext =
-        (state.hasOnlineStore || allText.includes('shopify') || allText.includes('tienda')) &&
-        (state.hasAdsInfo || allText.includes('publicidad') || allText.includes('ads') ||
-         allText.includes('ventas') || allText.includes('vender'));
+      const hasShopifyContext =
+        state.platform === 'shopify' ||
+        allText.includes('shopify') ||
+        state.hasOnlineStore === true ||
+        allText.includes('tienda online') ||
+        allText.includes('ecommerce') ||
+        allText.includes('e-commerce');
 
-      if (hasMinimalContext) {
+      // Si tiene Shopify/tienda Y expresó dolor → INTERVENIR INMEDIATAMENTE
+      if (hasShopifyContext) {
         state.interventionMoment = true;
         state.readyToPropose = true;
         state.phase = 'PROPUESTA';
-        logger.info('🔥 MOMENTO DE INTERVENCIÓN detectado - Lead caliente con contexto suficiente');
+        logger.info('🔥 MOMENTO DE INTERVENCIÓN detectado - Lead caliente + Shopify confirmado');
       }
     }
 
@@ -255,26 +267,37 @@ SOLO una pregunta. Natural y empático.`;
 
     // 🔥 MOMENTO DE INTERVENCIÓN (prioridad máxima)
     if (state.interventionMoment) {
-      instructions = `🔥 MOMENTO DE INTERVENCIÓN - LEAD CALIENTE DETECTADO
+      instructions = `🔥🔥🔥 ALERTA MÁXIMA - LEAD CALIENTE - CERRAR AHORA 🔥🔥🔥
 
-TU TAREA AHORA:
-Usuario expresó DOLOR + INTENCIÓN + ADMISIÓN DE FRACASO.
-NO sigas diagnosticando. NO hagas preguntas técnicas.
+⚠️ DETECCIÓN CRÍTICA:
+Usuario expresó DOLOR/PROBLEMA y tiene Shopify.
+TU MISIÓN: AGENDAR REUNIÓN AHORA. NO HACER MÁS PREGUNTAS.
 
-RESPONDE ASÍ (estructura exacta):
-1. Valida el dolor brevemente (1 línea): "Uf, te cacho" o "Pucha, entiendo"
-2. Presenta Datapify como solución (1 línea): "Justo Datapify ayuda a tiendas Shopify que [problema del usuario]"
-3. Ofrece reunión (1 línea): "¿Te tinca que veamos tu caso en 30 min y te muestro cómo mejorar?"
+❌ PROHIBIDO ABSOLUTAMENTE:
+- Hacer preguntas diagnósticas
+- Dar consejos técnicos
+- Explicar cómo funciona nada
+- Preguntar "¿has probado X?"
+- Decir "puedes revisar..."
+- Ser soporte técnico
 
-Ejemplo:
-"Uf, te cacho. Justo Datapify ayuda a tiendas Shopify que invierten en Meta Ads y no están viendo resultados. ¿Te tinca que veamos tu caso en 30 min y te muestro cómo mejorar?"
+✅ LO ÚNICO QUE DEBES HACER:
+Usar esta estructura EXACTA en 3 líneas:
 
-IMPORTANTE:
-- NO preguntes más sobre su negocio
-- NO des consejos técnicos
-- NO expliques Datapify en detalle
-- SÉ directo y empático
-- Máximo 3 líneas`;
+Línea 1: Validar dolor con empatía
+"Uf, te cacho" o "Pucha, qué frustrante" o "Entiendo totalmente"
+
+Línea 2: Presentar Datapify como LA solución al problema específico del usuario
+"Justo Datapify ayuda a tiendas Shopify que [problema exacto del usuario]"
+
+Línea 3: Ofrecer reunión INMEDIATAMENTE
+"¿Te tinca que veamos tu caso en 30 min y te muestro cómo solucionarlo?"
+
+EJEMPLO PERFECTO:
+Usuario: "invierto en publicidad pero no me compran"
+Tú: "Uf, te cacho. Justo Datapify ayuda a tiendas Shopify que invierten en ads pero no logran ventas. ¿Te tinca que veamos tu caso en 30 min y te muestro cómo solucionarlo?"
+
+🎯 OBJETIVO: AGENDAR. NO DAR SOPORTE. VENDER.`;
     } else if (state.phase === 'PROPUESTA' && state.readyToPropose) {
       instructions = `TU TAREA AHORA:
 Usuario califica para reunión.
