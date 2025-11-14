@@ -3,7 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const logger = require('../utils/logger');
+const behaviourController = require('./behaviourController');
+const orchestrationService = require('./orchestrationService');
 
+/**
+ * ARQUITECTURA DE 3 CAPAS
+ * Capa 1: System Prompt (personalidad y principios)
+ * Capa 2: Orchestration Service (reglas conversacionales)
+ * Capa 3: Behaviour Controller (estado y flujo)
+ */
 class OpenAIService {
   constructor() {
     this.openai = new OpenAI({
@@ -13,7 +21,7 @@ class OpenAIService {
     // Cargar conocimiento del negocio
     this.businessKnowledge = this.loadBusinessKnowledge();
 
-    // System prompt optimizado
+    // System prompt optimizado (CAPA 1)
     this.systemPrompt = this.buildSystemPrompt();
   }
 
@@ -98,11 +106,50 @@ RECUERDA: Eres un HUMANO conversando, no un bot ejecutando pasos. Adapta tu resp
   }
 
   /**
-   * Genera una respuesta usando OpenAI
+   * Genera una respuesta usando las 3 CAPAS
+   * NUEVA ARQUITECTURA PROFESIONAL
    */
   async generateResponse(userMessage, conversationHistory = [], leadScore = null) {
     try {
+      // ============================================
+      // CAPA 3: BEHAVIOUR CONTROLLER
+      // Analizar estado de la conversación
+      // ============================================
+      const conversationState = behaviourController.analyzeConversationState(conversationHistory);
+      const dynamicInstructions = behaviourController.generateDynamicInstructions(conversationState);
+
+      logger.info('🧠 Estado de conversación analizado', {
+        phase: conversationState.phase,
+        hasName: conversationState.hasName,
+        platform: conversationState.platform,
+        shouldDescalify: conversationState.shouldDescalify,
+        readyToPropose: conversationState.readyToPropose,
+      });
+
+      // Si debe descalificar, retornar mensaje directamente
+      if (conversationState.shouldDescalify && dynamicInstructions.includes('DESCALIFICAR')) {
+        const descalifyMessage = dynamicInstructions.split('Responde: ')[1].split(' y TERMINA')[0].replace(/"/g, '');
+        return descalifyMessage;
+      }
+
+      // ============================================
+      // CAPA 2: ORCHESTRATION SERVICE
+      // Preparar contexto y validar reglas
+      // ============================================
+      const sentiment = orchestrationService.detectUserSentiment(userMessage);
+      const context = orchestrationService.buildContext(
+        userMessage,
+        conversationHistory,
+        dynamicInstructions,
+        sentiment
+      );
+
+      logger.info('🎭 Sentimiento detectado', { sentiment });
+
+      // ============================================
+      // CAPA 1: SYSTEM PROMPT + LLM
       // Construir mensajes para OpenAI
+      // ============================================
       const messages = [
         {
           role: 'system',
@@ -110,109 +157,114 @@ RECUERDA: Eres un HUMANO conversando, no un bot ejecutando pasos. Adapta tu resp
         },
       ];
 
-      // Agregar contexto del lead si existe
-      if (leadScore) {
-        messages.push({
-          role: 'system',
-          content: `LEAD ACTUAL: ${leadScore.temperature} (${leadScore.score}/10) | Fase: ${leadScore.phase}`,
-        });
-      }
+      // Agregar instrucciones dinámicas de Behaviour Controller
+      messages.push({
+        role: 'system',
+        content: `INSTRUCCIONES DINÁMICAS (SIGUE ESTO):
+${context.dynamicInstructions}${context.sentimentInstructions}
 
-      // Agregar historial (últimos 8 mensajes para mejor memoria)
-      const recentHistory = conversationHistory.slice(-8);
+REGLAS ESTRICTAS:
+- ${context.rules.maxLength}
+- ${context.rules.maxQuestions}
+- ${context.rules.maxLines}
+- Estilo: ${context.rules.style}`,
+      });
 
-      if (recentHistory.length > 0) {
-        // Resumen del historial para que NO olvide
-        const historyText = recentHistory.map(msg => {
-          const role = msg.role === 'usuario' ? 'Usuario' : 'Tú';
-          return `${role}: ${msg.content}`;
-        }).join('\n');
-
-        messages.push({
-          role: 'system',
-          content: `HISTORIAL DE CONVERSACIÓN (LEE ESTO ANTES DE RESPONDER):
-${historyText}
-
-IMPORTANTE:
-- NO preguntes lo que YA te dijeron
-- USA la información del historial
-- Si ya conoces su nombre, úsalo
-- Si ya sabes su negocio/productos, NO lo vuelvas a preguntar
-- Si ya confirmó Shopify, NO lo vuelvas a preguntar`,
-        });
-
-        // Agregar mensajes al formato OpenAI
-        recentHistory.forEach(msg => {
+      // Agregar historial limpio (solo últimos 6 mensajes)
+      const preparedHistory = context.preparedHistory;
+      if (preparedHistory.length > 0) {
+        preparedHistory.forEach(msg => {
           messages.push({
-            role: msg.role === 'usuario' ? 'user' : 'assistant',
+            role: msg.role === 'usuario' || msg.role === 'user' ? 'user' : 'assistant',
             content: msg.content,
           });
         });
       }
 
-      // Agregar contexto de razonamiento
-      messages.push({
-        role: 'system',
-        content: `RAZONA antes de responder:
-
-1. ¿Qué acaba de pasar en la conversación?
-2. ¿Qué emoción o necesidad está expresando la persona?
-3. ¿Qué sería una respuesta HUMANA y empática?
-4. ¿Qué necesito saber para ayudarlos mejor?
-
-PRINCIPIOS:
-- Sé auténtico, NO robótico
-- Varía tus respuestas (nunca uses las mismas palabras 2 veces seguidas)
-- Adapta tu tono a la persona (apurado = directo, relajado = conversador)
-- NO fuerces el flujo - deja que la conversación fluya naturalmente
-
-Si la persona:
-- Está frustrada → Valida primero, luego explora
-- Está escéptica → Haz preguntas, NO vendas
-- Está emocionada → Celebra con ellos
-- Está apurada → Sé directo
-
-Max 2 líneas. 1 pregunta. Natural y humano.`,
-      });
-
-      // Agregar mensaje actual del usuario
+      // Agregar mensaje actual del usuario (limpio)
       messages.push({
         role: 'user',
-        content: userMessage,
+        content: context.cleanedMessage,
       });
 
-      // Llamar a OpenAI con retry logic
-      const maxRetries = 3;
+      // ============================================
+      // LLAMAR AL LLM CON PARÁMETROS ÓPTIMOS
+      // ============================================
+      const maxRetries = 2;
       let lastError;
+      let validResponse = null;
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           const completion = await this.openai.chat.completions.create({
-            model: 'gpt-4o', // Modelo más inteligente para razonamiento
+            model: 'gpt-4o', // Modelo inteligente
             messages: messages,
-            temperature: 0.8, // Más creativo y natural
-            max_tokens: 200, // Suficiente para respuestas naturales
-            top_p: 0.95,
-            frequency_penalty: 0.5, // Evita repeticiones fuertes
-            presence_penalty: 0.6,  // Fomenta más variedad
+            temperature: 0.7, // Natural pero no demasiado creativo (0.6-0.8 óptimo)
+            max_tokens: 120, // Respuestas cortas para WhatsApp
+            top_p: 1, // Full sampling
+            frequency_penalty: 0.4, // Evita repetir palabras (0.2-0.5 óptimo)
+            presence_penalty: 0.4, // Fomenta variedad de temas (0.2-0.5 óptimo)
           });
 
-          const responseText = completion.choices[0].message.content;
+          let responseText = completion.choices[0].message.content.trim();
 
-          if (attempt > 1) {
-            logger.info(`✅ OpenAI exitoso en intento ${attempt}`);
+          // ============================================
+          // VALIDAR RESPUESTA (CAPA 2)
+          // ============================================
+          const validation = orchestrationService.validateResponse(responseText);
+
+          if (!validation.valid) {
+            logger.warn('⚠️ Respuesta no válida', { errors: validation.errors });
+
+            // Si hay errores y quedan reintentos, pedir nueva respuesta
+            if (attempt < maxRetries) {
+              messages.push({
+                role: 'system',
+                content: `CORRECCIÓN NECESARIA:
+Tu respuesta fue rechazada por: ${validation.errors.join(', ')}
+
+Genera UNA NUEVA respuesta que cumpla TODAS las reglas:
+- Máximo 250 caracteres
+- Máximo 3 líneas
+- Máximo 1 pregunta
+- Natural y humana`,
+              });
+              continue;
+            }
           }
 
-          logger.info('✅ Respuesta generada por OpenAI', {
-            inputLength: userMessage.length,
-            outputLength: responseText.length,
+          // Formatear para WhatsApp
+          responseText = orchestrationService.formatForWhatsApp(responseText);
+
+          // Validar con Behaviour Controller
+          const behaviourValidation = behaviourController.validateResponse(responseText, conversationState);
+
+          if (!behaviourValidation.valid) {
+            logger.warn('⚠️ Respuesta rechazada por behaviour', { errors: behaviourValidation.errors });
+
+            if (attempt < maxRetries) {
+              messages.push({
+                role: 'system',
+                content: `CORRECCIÓN: ${behaviourValidation.errors.join(', ')}. Genera nueva respuesta corrigiendo estos errores.`,
+              });
+              continue;
+            }
+          }
+
+          // Log métricas
+          orchestrationService.logMetrics(responseText, validation);
+
+          logger.info('✅ Respuesta generada y validada', {
+            length: responseText.length,
             model: completion.model,
             tokensUsed: completion.usage.total_tokens,
-            leadTemp: leadScore?.temperature || 'unknown',
             attempt,
+            valid: validation.valid,
+            warnings: validation.warnings.length,
           });
 
           return responseText;
+
         } catch (error) {
           lastError = error;
 
@@ -224,11 +276,8 @@ Max 2 líneas. 1 pregunta. Natural y humano.`,
                               error.code === 'ETIMEDOUT';
 
           if (isRetryable && attempt < maxRetries) {
-            const baseWait = attempt * 1000;
-            const jitter = Math.random() * 500;
-            const waitTime = baseWait + jitter;
-
-            logger.warn(`⚠️ OpenAI error (${error.status || error.code}). Retry ${attempt + 1}/${maxRetries} en ${Math.round(waitTime)}ms`);
+            const waitTime = attempt * 1000 + Math.random() * 500;
+            logger.warn(`⚠️ OpenAI error (${error.status || error.code}). Retry ${attempt + 1}/${maxRetries}`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             continue;
           }
@@ -237,15 +286,19 @@ Max 2 líneas. 1 pregunta. Natural y humano.`,
         }
       }
 
-      throw lastError;
+      // Si todo falla, usar fallback
+      logger.error('❌ Todos los intentos fallaron, usando fallback');
+      return orchestrationService.getFallbackResponse(lastError);
+
     } catch (error) {
-      logger.error('Error generando respuesta con OpenAI:', {
+      logger.error('Error generando respuesta:', {
         message: error.message,
         status: error.status,
         code: error.code,
-        type: error.type,
       });
-      throw error;
+
+      // Fallback final
+      return orchestrationService.getFallbackResponse(error);
     }
   }
 
