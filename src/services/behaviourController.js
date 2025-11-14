@@ -106,13 +106,13 @@ class BehaviourController {
     }
 
     // Contar preguntas que YA hicimos
-    const assistantMessages = history.filter(h => h.role === 'assistant');
+    const assistantMessages = history.filter(h => h.role === 'assistant' || h.role === 'asistente');
     assistantMessages.forEach(msg => {
       const text = msg.content.toLowerCase();
       if (text.includes('llamo') || text.includes('tu nombre')) state.alreadyAskedName = true;
       if (text.includes('shopify') || text.includes('plataforma')) state.alreadyAskedPlatform = true;
-      if (text.includes('qué vendes') || text.includes('a qué te dedicas')) state.alreadyAskedBusiness = true;
-      if (text.includes('reunión') || text.includes('agendar') || text.includes('te tinca')) state.alreadyOfferedMeeting = true;
+      if (text.includes('qué vendes') || text.includes('a qué te dedicas') || text.includes('tienda online')) state.alreadyAskedBusiness = true;
+      if (text.includes('reunión') || text.includes('agendar') || text.includes('te tinca') || text.includes('coordinemos')) state.alreadyOfferedMeeting = true;
       if (text.includes('?')) state.questionsAsked++;
     });
 
@@ -152,54 +152,46 @@ class BehaviourController {
 
     // Instrucciones según fase
     if (state.phase === 'APERTURA') {
-      instructions = `FASE: APERTURA
-- Saluda de forma natural y humana
-- Pregunta en qué puedes ayudar o a qué se dedica
-- NO preguntes nada más aún
-- Máximo 2 líneas`;
+      instructions = `TU TAREA AHORA:
+Pregunta: "¿A qué te dedicas?" o "¿En qué te puedo ayudar?"
+SOLO eso. NO menciones Datapify aún.`;
     }
 
     if (state.phase === 'DESCUBRIMIENTO') {
       if (!state.hasOnlineStore && !state.alreadyAskedBusiness) {
-        instructions = `FASE: DESCUBRIMIENTO
-- Aún no sabemos si tiene tienda online
-- Pregunta de forma natural: "¿Tienes tienda online?" o "¿Vendes online?"
-- NO preguntes por Shopify todavía
-- Máximo 2 líneas, 1 pregunta`;
+        instructions = `TU TAREA AHORA:
+Pregunta: "¿Tienes tienda online?"
+SOLO eso. NO preguntes por Shopify aún.`;
       } else if (state.hasOnlineStore && !state.platform && !state.alreadyAskedPlatform) {
-        instructions = `FASE: DESCUBRIMIENTO
-- Ya sabemos que tiene tienda online
-- Ahora pregunta naturalmente: "¿Está en Shopify o en otra plataforma?"
-- NO hagas otras preguntas
-- Máximo 2 líneas`;
+        instructions = `TU TAREA AHORA:
+Usuario tiene tienda online.
+Pregunta: "¿Está en Shopify o en otra plataforma?"
+SOLO eso. NO hagas otras preguntas.`;
       }
     }
 
     if (state.phase === 'CALIFICACIÓN') {
-      instructions = `FASE: CALIFICACIÓN
-- Usuario tiene Shopify ✅
-- Ahora descubre su situación: ventas, publicidad, frustraciones
-- Haz UNA pregunta sobre su negocio
-- Sé empático y curioso
-- Máximo 2 líneas`;
+      instructions = `TU TAREA AHORA:
+Usuario tiene Shopify ✅
+Haz UNA pregunta sobre su negocio: ventas, publicidad, o frustraciones.
+Ejemplo: "¿Cómo te ha ido con las ventas?" o "¿Inviertes en publicidad?"
+SOLO una pregunta. Natural y empático.`;
     }
 
     if (state.phase === 'PROPUESTA' && state.readyToPropose) {
-      instructions = `FASE: PROPUESTA
-- Usuario califica (Shopify + interés)
-- Es momento de proponer reunión
-- Pregunta de forma natural: "¿Te tinca que veamos tu caso en 30 min?"
-- NO seas vendedor, sé consultor
-- Máximo 2 líneas`;
+      instructions = `TU TAREA AHORA:
+Usuario califica para reunión.
+Pregunta: "¿Te tinca que veamos tu caso en 30 min?"
+SOLO eso. NO seas vendedor.`;
     }
 
     if (state.phase === 'CIERRE') {
       if (state.alreadyOfferedMeeting) {
-        instructions = `FASE: CIERRE
-- Ya ofreciste reunión
-- Responde lo que necesite el usuario
-- Si confirma, di EXACTAMENTE: "Perfecto, te paso el link para agendar"
-- Máximo 2 líneas`;
+        instructions = `TU TAREA AHORA:
+Ya ofreciste reunión.
+Si usuario confirma (dice "sí", "dale", "ok"), responde EXACTAMENTE:
+"Perfecto, te paso el link para agendar"
+Si pregunta algo, respóndele brevemente.`;
       }
     }
 
