@@ -117,10 +117,21 @@ class BehaviourController {
       }
     }
 
-    // Detectar si tiene tienda online
-    if (allText.includes('tienda') || allText.includes('ecommerce') || allText.includes('e-commerce') || allText.includes('vendo online')) {
+    // Detectar si tiene tienda online (más específico)
+    const onlineStoreSignals = [
+      'tienda online',
+      'tienda en línea',
+      'ecommerce',
+      'e-commerce',
+      'vendo online',
+      'vendo por internet',
+      'página web' // Agregado para detectar, pero NO es suficiente para intervenir
+    ];
+
+    if (onlineStoreSignals.some(signal => allText.includes(signal))) {
       state.hasOnlineStore = true;
     }
+
     if (allText.includes('no tengo tienda') || allText.includes('no vendo online')) {
       state.hasOnlineStore = false;
       state.shouldDescalify = true;
@@ -179,25 +190,27 @@ class BehaviourController {
     });
 
     // 🔥 MOMENTO DE INTERVENCIÓN
-    // Si detecta HOT LEAD + mínimo contexto → saltar a PROPUESTA inmediata
+    // Si detecta HOT LEAD + SHOPIFY CONFIRMADO → saltar a PROPUESTA inmediata
     if (state.hotLeadSignals) {
-      // Condiciones PERMISIVAS para intervención:
-      // Solo necesita: Señales HOT + (Shopify confirmado O tiene tienda O mencionó ecommerce)
+      // Condiciones ESTRICTAS para intervención:
+      // REQUIERE: Señales HOT + Shopify EXPLÍCITAMENTE confirmado
 
-      const hasShopifyContext =
+      const hasShopifyConfirmed =
         state.platform === 'shopify' ||
-        allText.includes('shopify') ||
-        state.hasOnlineStore === true ||
-        allText.includes('tienda online') ||
-        allText.includes('ecommerce') ||
-        allText.includes('e-commerce');
+        allText.includes('uso shopify') ||
+        allText.includes('tengo shopify') ||
+        allText.includes('con shopify') ||
+        allText.includes('en shopify');
 
-      // Si tiene Shopify/tienda Y expresó dolor → INTERVENIR INMEDIATAMENTE
-      if (hasShopifyContext) {
+      // SOLO intervenir si Shopify está CONFIRMADO (no solo "tiene tienda")
+      if (hasShopifyConfirmed) {
         state.interventionMoment = true;
         state.readyToPropose = true;
         state.phase = 'PROPUESTA';
-        logger.info('🔥 MOMENTO DE INTERVENCIÓN detectado - Lead caliente + Shopify confirmado');
+        logger.info('🔥 MOMENTO DE INTERVENCIÓN detectado - HOT LEAD + Shopify confirmado');
+      } else {
+        // Tiene dolor pero NO confirmó Shopify → Debe preguntar plataforma PRIMERO
+        logger.info('⚠️ HOT LEAD detectado pero sin confirmar Shopify - debe calificar plataforma primero');
       }
     }
 
@@ -256,12 +269,20 @@ No sabes si tiene tienda online (requisito para Datapify).
 Averigua esto conversacionalmente. No seas directo tipo "¿tienes tienda online?"
 Mejor algo como "¿Cómo vendes actualmente?" o "Cuéntame de tu tienda"`;
       } else if (state.hasOnlineStore && !state.platform && !state.alreadyAskedPlatform) {
-        instructions = `━━━ CONTEXTO: Calificando plataforma ━━━
+        instructions = `━━━ CONTEXTO: Calificando plataforma (CRÍTICO) ━━━
 
-Tiene tienda online ✅, pero no sabes la plataforma.
+Tiene tienda/página web ✅, pero NO sabes qué plataforma usa.
 
-CRÍTICO: Solo trabajas con Shopify. Averigua qué plataforma usa.
-Pregunta natural: "¿Qué plataforma usas?" o "¿Vendes por Shopify?"`;
+🚨 CRÍTICO: Solo trabajas con Shopify. Debes preguntar la plataforma AHORA.
+
+NO asumas nada. NO hables de "frustración con ads" si no la mencionó.
+NO ofrezcas reunión todavía.
+
+Pregunta directa y natural:
+• "Buena! ¿Qué plataforma usas? ¿Shopify, WooCommerce...?"
+• "¿Vendes por Shopify o usas otra cosa?"
+
+Solo cuando CONFIRME Shopify → puedes seguir descubriendo dolor.`;
       }
     }
 
