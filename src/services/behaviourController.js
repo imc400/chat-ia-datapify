@@ -22,6 +22,8 @@ class BehaviourController {
       hasRevenueInfo: false,
       hasAdsInfo: false,
       showedInterest: false,
+      hasPainPoint: false, // NUEVO: ¿Expresó frustración o problema?
+      askedAboutAds: false, // NUEVO: ¿Ya preguntamos por publicidad?
 
       // Control de flujo
       questionsAsked: 0,
@@ -178,8 +180,32 @@ class BehaviourController {
       state.showedInterest = true;
     }
 
+    // NUEVO: Detectar pain points (dolor/problema/frustración)
+    const painPointSignals = [
+      'no vendo', 'no estoy vendiendo', 'ventas bajas', 'pocas ventas',
+      'no funciona', 'no me funciona', 'no sirve',
+      'frustrad', 'cansad', 'harto', 'mal',
+      'no me va bien', 'me va mal', 'resultados malos',
+      'gasto mucho', 'pierdo plata', 'pierdo dinero',
+      'no compran', 'no me compran',
+      'cayeron las ventas', 'bajaron las ventas',
+      'ads no funcionan', 'publicidad no funciona',
+      'no veo resultados', 'sin resultados'
+    ];
+
+    if (painPointSignals.some(signal => allText.includes(signal))) {
+      state.hasPainPoint = true;
+    }
+
     // Contar preguntas que YA hicimos
     const assistantMessages = history.filter(h => h.role === 'assistant' || h.role === 'asistente');
+
+    // Detectar si ya preguntamos por ads/publicidad
+    const assistantAskedAboutAds = assistantMessages.some(msg => {
+      const text = msg.content.toLowerCase();
+      return (text.includes('publicidad') || text.includes('ads') || text.includes('anuncios')) && text.includes('?');
+    });
+    state.askedAboutAds = assistantAskedAboutAds;
     assistantMessages.forEach(msg => {
       const text = msg.content.toLowerCase();
       if (text.includes('llamo') || text.includes('tu nombre')) state.alreadyAskedName = true;
@@ -220,9 +246,14 @@ class BehaviourController {
         state.phase = 'APERTURA';
       } else if (!state.hasOnlineStore || !state.platform) {
         state.phase = 'DESCUBRIMIENTO';
-      } else if (state.platform === 'shopify' && !state.hasBusinessInfo) {
+      } else if (state.platform === 'shopify' && !state.askedAboutAds) {
+        // CRÍTICO: Tiene Shopify pero NO hemos preguntado por publicidad/dolor
         state.phase = 'CALIFICACIÓN';
-      } else if (state.platform === 'shopify' && state.hasBusinessInfo && !state.alreadyOfferedMeeting) {
+      } else if (state.platform === 'shopify' && state.askedAboutAds && !state.hasPainPoint) {
+        // Ya preguntamos por ads pero NO expresó dolor → seguir calificando
+        state.phase = 'CALIFICACIÓN';
+      } else if (state.platform === 'shopify' && state.hasPainPoint && !state.alreadyOfferedMeeting) {
+        // Tiene Shopify + DOLOR confirmado → AHORA SÍ proponer
         state.phase = 'PROPUESTA';
         state.readyToPropose = true;
       } else {
@@ -287,17 +318,44 @@ Solo cuando CONFIRME Shopify → puedes seguir descubriendo dolor.`;
     }
 
     if (state.phase === 'CALIFICACIÓN') {
-      instructions = `━━━ CONTEXTO: Lead calificado (tiene Shopify) ━━━
+      if (!state.askedAboutAds) {
+        // Todavía NO hemos preguntado por publicidad/dolor
+        instructions = `━━━ CONTEXTO: Calificando DOLOR (paso crítico) ━━━
 
-Tiene Shopify ✅. Ahora descubre su DOLOR.
+Tiene Shopify ✅. Sabes qué vende ✅.
 
-Pregunta sobre:
-• ¿Cómo le va con la publicidad?
-• ¿Está invirtiendo en ads?
-• ¿Ve resultados o está frustrado?
+PERO aún NO sabes si tiene un PROBLEMA que resolver.
 
-Si expresa frustración o problema real → OFRECE REUNIÓN de inmediato.
-Tu instinto de vendedor debe activarse aquí.`;
+🚨 CRÍTICO: Debes preguntar por publicidad/resultados AHORA.
+
+Preguntas naturales:
+• "¿Cómo te va con la publicidad?"
+• "¿Inviertes en ads de Meta/Facebook?"
+• "¿Estás vendiendo bien o andas medio bajo?"
+
+NO ofrezcas reunión todavía. Necesitas escuchar su dolor primero.`;
+      } else if (!state.hasPainPoint) {
+        // Ya preguntamos pero NO expresó dolor claro
+        instructions = `━━━ CONTEXTO: Profundizar en DOLOR ━━━
+
+Shopify ✅. Preguntaste por publicidad ✅.
+
+Pero NO expresó frustración o problema claro todavía.
+
+Indaga más:
+• "¿Y te están funcionando? ¿Ves buenos resultados?"
+• "¿Sientes que estás gastando mucho vs lo que vendes?"
+
+Si dice que le va BIEN → Descalifica gentilmente (no necesita Datapify ahora).
+Si dice que le va MAL o tiene problemas → AHÍ ofreces reunión.`;
+      } else {
+        // Tiene dolor pero por alguna razón no llegó a PROPUESTA
+        instructions = `━━━ CONTEXTO: Tiene DOLOR confirmado ━━━
+
+Shopify ✅. Dolor/problema confirmado ✅.
+
+Momento de ofrecer reunión.`;
+      }
     }
 
     // 🔥 MOMENTO DE INTERVENCIÓN (prioridad máxima)
