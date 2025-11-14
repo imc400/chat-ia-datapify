@@ -61,14 +61,12 @@ const transports = [
   }),
 ];
 
-// En desarrollo, también mostrar en consola
-if (config.nodeEnv !== 'production') {
-  transports.push(
-    new winston.transports.Console({
-      format: consoleFormat,
-    })
-  );
-}
+// Siempre mostrar en consola (necesario para Railway, Heroku, etc.)
+transports.push(
+  new winston.transports.Console({
+    format: consoleFormat,
+  })
+);
 
 // Crear logger
 const logger = winston.createLogger({
