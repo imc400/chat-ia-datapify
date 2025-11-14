@@ -237,81 +237,51 @@ class BehaviourController {
       }
     }
 
-    // Instrucciones según fase
+    // Instrucciones según fase (GUÍAS, no scripts)
     if (state.phase === 'APERTURA') {
-      instructions = `TU TAREA AHORA:
-Pregunta: "¿A qué te dedicas?" o "¿En qué te puedo ayudar?"
-SOLO eso. NO menciones Datapify aún.`;
+      instructions = `CONTEXTO: Primera interacción.
+Descubre qué buscan. Pregunta natural sobre su negocio o qué necesitan.`;
     }
 
     if (state.phase === 'DESCUBRIMIENTO') {
       if (!state.hasOnlineStore && !state.alreadyAskedBusiness) {
-        instructions = `TU TAREA AHORA:
-Pregunta: "¿Tienes tienda online?"
-SOLO eso. NO preguntes por Shopify aún.`;
+        instructions = `CONTEXTO: No sabes si tiene tienda online.
+Averigua esto de forma natural en la conversación.`;
       } else if (state.hasOnlineStore && !state.platform && !state.alreadyAskedPlatform) {
-        instructions = `TU TAREA AHORA:
-Usuario tiene tienda online.
-Pregunta: "¿Está en Shopify o en otra plataforma?"
-SOLO eso. NO hagas otras preguntas.`;
+        instructions = `CONTEXTO: Tiene tienda online, pero no sabes la plataforma.
+Pregunta qué plataforma usa (necesitas saber si es Shopify).`;
       }
     }
 
     if (state.phase === 'CALIFICACIÓN') {
-      instructions = `TU TAREA AHORA:
-Usuario tiene Shopify ✅
-Haz UNA pregunta sobre su negocio: ventas, publicidad, o frustraciones.
-Ejemplo: "¿Cómo te ha ido con las ventas?" o "¿Inviertes en publicidad?"
-SOLO una pregunta. Natural y empático.`;
+      instructions = `CONTEXTO: Tiene Shopify ✅
+Descubre si tiene problemas con publicidad, ventas, o conversión.
+Si expresa un problema real, ofrece reunión inmediatamente.`;
     }
 
     // 🔥 MOMENTO DE INTERVENCIÓN (prioridad máxima)
     if (state.interventionMoment) {
-      instructions = `🔥🔥🔥 ALERTA MÁXIMA - LEAD CALIENTE - CERRAR AHORA 🔥🔥🔥
+      instructions = `🔥 LEAD CALIENTE DETECTADO
 
-⚠️ DETECCIÓN CRÍTICA:
-Usuario expresó DOLOR/PROBLEMA y tiene Shopify.
-TU MISIÓN: AGENDAR REUNIÓN AHORA. NO HACER MÁS PREGUNTAS.
+Usuario expresó un problema real y tiene Shopify.
 
-❌ PROHIBIDO ABSOLUTAMENTE:
-- Hacer preguntas diagnósticas
-- Dar consejos técnicos
-- Explicar cómo funciona nada
-- Preguntar "¿has probado X?"
-- Decir "puedes revisar..."
-- Ser soporte técnico
+Tu instinto de vendedor dice: "Este es el momento de cerrar."
 
-✅ LO ÚNICO QUE DEBES HACER:
-Usar esta estructura EXACTA en 3 líneas:
+NO des consejos. NO diagnostiques más. Tu valor está en la reunión, no en el chat.
 
-Línea 1: Validar dolor con empatía
-"Uf, te cacho" o "Pucha, qué frustrante" o "Entiendo totalmente"
+Valida su dolor brevemente, conecta con Datapify como solución, y ofrece reunión de 30 min.
 
-Línea 2: Presentar Datapify como LA solución al problema específico del usuario
-"Justo Datapify ayuda a tiendas Shopify que [problema exacto del usuario]"
-
-Línea 3: Ofrecer reunión INMEDIATAMENTE
-"¿Te tinca que veamos tu caso en 30 min y te muestro cómo solucionarlo?"
-
-EJEMPLO PERFECTO:
-Usuario: "invierto en publicidad pero no me compran"
-Tú: "Uf, te cacho. Justo Datapify ayuda a tiendas Shopify que invierten en ads pero no logran ventas. ¿Te tinca que veamos tu caso en 30 min y te muestro cómo solucionarlo?"
-
-🎯 OBJETIVO: AGENDAR. NO DAR SOPORTE. VENDER.`;
+Confía en tu instinto. Cierra naturalmente.`;
     } else if (state.phase === 'PROPUESTA' && state.readyToPropose) {
-      instructions = `TU TAREA AHORA:
-Usuario califica para reunión.
-Pregunta: "¿Te tinca que veamos tu caso en 30 min?"
-SOLO eso. NO seas vendedor.`;
+      instructions = `CONTEXTO: Usuario califica (Shopify + tiene contexto).
+Momento de ofrecer reunión. Hazlo natural, no fuerces.`;
     }
 
     if (state.phase === 'CIERRE') {
       if (state.alreadyOfferedMeeting) {
-        instructions = `TU TAREA AHORA:
-Ya ofreciste reunión.
-Si usuario confirma (dice "sí", "dale", "ok"), responde EXACTAMENTE:
-"Perfecto, te paso el link para agendar"
-Si pregunta algo, respóndele brevemente.`;
+        instructions = `CONTEXTO: Ya ofreciste reunión.
+Si confirma, di que le enviarás el link.
+Si pregunta algo, responde y mantén el momentum de agendar.`;
       }
     }
 
