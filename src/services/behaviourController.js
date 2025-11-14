@@ -265,169 +265,70 @@ class BehaviourController {
   }
 
   /**
-   * Genera instrucciones dinámicas basadas en el estado
-   * Esto controla qué debe hacer el agente AHORA
+   * Genera instrucciones dinámicas SIMPLES basadas en el estado
+   * Solo información de contexto, NO scripts
    */
   generateDynamicInstructions(state) {
     let instructions = '';
+    let context = [];
 
     // Si debe descalificar
     if (state.shouldDescalify) {
       if (state.descalifyReason === 'no_online_store') {
-        return `DESCALIFICAR: El usuario no tiene tienda online. Responde: "Datapify es para tiendas online. Cuando tengas una, hablamos :)" y TERMINA la conversación.`;
+        return `DESCALIFICAR: No tiene tienda online. Di algo como "Datapify es para tiendas online. Cuando tengas una, hablamos :)"`;
       }
       if (state.descalifyReason === 'not_shopify') {
-        return `DESCALIFICAR: El usuario no usa Shopify. Responde: "Datapify funciona solo con Shopify. Si migras en el futuro, conversamos :)" y TERMINA la conversación.`;
+        return `DESCALIFICAR: No usa Shopify. Di algo como "Datapify funciona solo con Shopify. Si migras algún día, conversamos :)"`;
       }
     }
 
-    // Instrucciones según fase (GUÍAS conversacionales, NO scripts)
-    if (state.phase === 'APERTURA') {
-      instructions = `━━━ CONTEXTO: Primera interacción ━━━
+    // ==========================================
+    // CONTEXTO SIMPLE: Qué sabemos y qué falta
+    // ==========================================
 
-Esta persona acaba de llegar. Tu trabajo es entender qué busca de forma genuina.
+    // Lo que YA sabemos
+    if (state.hasName) context.push(`Nombre: ${state.name}`);
+    if (state.platform) context.push(`Plataforma: ${state.platform}`);
+    if (state.hasBusinessInfo) context.push(`Vende: ${state.businessType}`);
+    if (state.hasAdsInfo) context.push(`Invierte en publicidad`);
+    if (state.hasPainPoint) context.push(`⚠️ Expresó problema/frustración`);
 
-Sé curioso. Pregunta sobre su negocio o qué lo trae por acá.
-Conversa como si fuera el primer WhatsApp con un emprendedor que viste en LinkedIn.`;
+    // Lo que NO sabemos (esto es lo importante)
+    let missing = [];
+    if (!state.hasOnlineStore) missing.push('¿Tiene tienda online?');
+    if (state.hasOnlineStore && !state.platform) missing.push('¿Qué plataforma usa? (CRÍTICO: necesitas confirmar Shopify)');
+    if (state.platform === 'shopify' && !state.hasBusinessInfo) missing.push('¿Qué vende?');
+    if (state.platform === 'shopify' && !state.askedAboutAds) missing.push('¿Cómo le va con publicidad/ventas? ¿Tiene problemas?');
+    if (state.platform === 'shopify' && state.askedAboutAds && !state.hasPainPoint) missing.push('¿Realmente tiene un problema? (si le va bien, no necesita Datapify)');
+
+    // Construir instrucciones super simples
+    let finalInstructions = '';
+
+    if (context.length > 0) {
+      finalInstructions += `\n━━━ LO QUE SABES ━━━\n${context.join('\n')}\n`;
     }
 
-    if (state.phase === 'DESCUBRIMIENTO') {
-      if (!state.hasOnlineStore && !state.alreadyAskedBusiness) {
-        instructions = `━━━ CONTEXTO: Descubriendo su negocio ━━━
-
-No sabes si tiene tienda online (requisito para Datapify).
-
-Averigua esto conversacionalmente. No seas directo tipo "¿tienes tienda online?"
-Mejor algo como "¿Cómo vendes actualmente?" o "Cuéntame de tu tienda"`;
-      } else if (state.hasOnlineStore && !state.platform && !state.alreadyAskedPlatform) {
-        instructions = `━━━ CONTEXTO: Calificando plataforma (CRÍTICO) ━━━
-
-Tiene tienda/página web ✅, pero NO sabes qué plataforma usa.
-
-🚨 CRÍTICO: Solo trabajas con Shopify. Debes preguntar la plataforma AHORA.
-
-NO asumas nada. NO hables de "frustración con ads" si no la mencionó.
-NO ofrezcas reunión todavía.
-
-Pregunta directa y natural:
-• "Buena! ¿Qué plataforma usas? ¿Shopify, WooCommerce...?"
-• "¿Vendes por Shopify o usas otra cosa?"
-
-Solo cuando CONFIRME Shopify → puedes seguir descubriendo dolor.`;
-      }
+    if (missing.length > 0) {
+      finalInstructions += `\n━━━ LO QUE TE FALTA SABER ━━━\n${missing.join('\n')}\n`;
+      finalInstructions += `\nDescubre esto conversando natural. NO hagas lista de preguntas. Ve paso a paso.`;
     }
 
-    if (state.phase === 'CALIFICACIÓN') {
-      if (!state.askedAboutAds) {
-        // Todavía NO hemos preguntado por publicidad/dolor
-        instructions = `━━━ CONTEXTO: Calificando DOLOR (paso crítico) ━━━
-
-Tiene Shopify ✅. Sabes qué vende ✅.
-
-PERO aún NO sabes si tiene un PROBLEMA que resolver.
-
-🚨 CRÍTICO: Debes preguntar por publicidad/resultados AHORA.
-
-Preguntas naturales:
-• "¿Cómo te va con la publicidad?"
-• "¿Inviertes en ads de Meta/Facebook?"
-• "¿Estás vendiendo bien o andas medio bajo?"
-
-NO ofrezcas reunión todavía. Necesitas escuchar su dolor primero.`;
-      } else if (!state.hasPainPoint) {
-        // Ya preguntamos pero NO expresó dolor claro
-        instructions = `━━━ CONTEXTO: Profundizar en DOLOR ━━━
-
-Shopify ✅. Preguntaste por publicidad ✅.
-
-Pero NO expresó frustración o problema claro todavía.
-
-Indaga más:
-• "¿Y te están funcionando? ¿Ves buenos resultados?"
-• "¿Sientes que estás gastando mucho vs lo que vendes?"
-
-Si dice que le va BIEN → Descalifica gentilmente (no necesita Datapify ahora).
-Si dice que le va MAL o tiene problemas → AHÍ ofreces reunión.`;
-      } else {
-        // Tiene dolor pero por alguna razón no llegó a PROPUESTA
-        instructions = `━━━ CONTEXTO: Tiene DOLOR confirmado ━━━
-
-Shopify ✅. Dolor/problema confirmado ✅.
-
-Momento de ofrecer reunión.`;
-      }
+    // Si ya tiene todo y tiene dolor → ofrece reunión
+    if (state.platform === 'shopify' && state.hasPainPoint && !state.alreadyOfferedMeeting) {
+      finalInstructions += `\n\n✅ Tiene Shopify + problema confirmado\nMomento de ofrecer reunión: "¿Te tinca una llamada de 30 min?"`;
     }
 
-    // 🔥 MOMENTO DE INTERVENCIÓN (prioridad máxima)
-    if (state.interventionMoment) {
-      instructions = `━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔥 LEAD CALIENTE - MOMENTO CRÍTICO
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Usuario expresó un DOLOR REAL + tiene Shopify ✅
-
-Tu instinto de vendedor debe decirte: "Este es EL momento"
-
-ESTRATEGIA:
-1. Valida su frustración (empatiza 1 línea)
-2. Conecta Datapify como solución (breve, 1 línea)
-3. Ofrece reunión de 30 min para ver si les sirve
-
-NO des consultoría gratis. NO diagnostiques en detalle.
-Tu valor está en la demo personalizada, no en el chat.
-
-Cierra con confianza pero sin presión. Conversacional, no vendedor agresivo.
-
-Ejemplo de tono: "Cacho tu frustración. Datapify automatiza eso que estás haciendo manual. ¿Te tinca una llamada de 30 min para ver si te sirve?"`;
-    } else if (state.phase === 'PROPUESTA' && state.readyToPropose) {
-      instructions = `━━━ CONTEXTO: Momento de proponer reunión ━━━
-
-Usuario califica (Shopify + contexto suficiente).
-
-Ofrece reunión conversacionalmente. NO lo fuerces.
-
-Ejemplos buenos:
-• "¿Te tinca una llamada de 30 min para mostrarte cómo funciona?"
-• "¿Quieres que agendemos 30 min para ver si Datapify te sirve?"
-
-Evita sonar corporativo: "Me gustaría agendar una reunión con usted"`;
+    // Si ya ofreció reunión
+    if (state.alreadyOfferedMeeting) {
+      finalInstructions += `\n\n⏳ Ya ofreciste reunión. Espera confirmación.
+Si dice "sí", "dale", "ok" → responde "Dale, te paso el link" (el sistema enviará automático)`;
     }
 
-    if (state.phase === 'CIERRE') {
-      if (state.alreadyOfferedMeeting) {
-        instructions = `━━━ CONTEXTO: Ya ofreciste reunión, esperando confirmación ━━━
+    // Prevenir preguntas repetidas
+    if (state.alreadyAskedPlatform) finalInstructions += `\n\n⚠️ YA preguntaste por plataforma, no vuelvas a hacerlo`;
+    if (state.askedAboutAds) finalInstructions += `\n\n⚠️ YA preguntaste por publicidad/ventas`;
 
-CRÍTICO - Detección automática de confirmación:
-
-Si usuario dice "sí", "dale", "ok", "perfecto", "sale", "demo", etc.:
-→ Responde algo como: "Perfecto, te paso el link para agendar"
-→ El sistema detectará esto y enviará el link de Google Calendar automáticamente
-
-NO inventes horarios. NO digas "te envío el link" sin confirmar primero.
-NO coordines fechas manualmente.
-
-El link tiene un calendario donde ellos eligen fecha/hora.
-
-Si usuario NO confirma (hace otra pregunta), responde esa pregunta primero.`;
-      }
-    }
-
-    // Bloqueos de preguntas repetidas
-    let blockedQuestions = '\n\nNO PREGUNTES (ya lo hiciste):';
-    if (state.alreadyAskedName) blockedQuestions += '\n- Su nombre';
-    if (state.alreadyAskedPlatform) blockedQuestions += '\n- Su plataforma';
-    if (state.alreadyAskedBusiness) blockedQuestions += '\n- A qué se dedica';
-    if (state.alreadyOfferedMeeting) blockedQuestions += '\n- Si quiere reunión (ya lo hiciste)';
-
-    // Info que ya conocemos
-    let knownInfo = '\n\nYA SABEMOS:';
-    if (state.hasName) knownInfo += `\n- Nombre: ${state.name}`;
-    if (state.platform) knownInfo += `\n- Plataforma: ${state.platform}`;
-    if (state.hasBusinessInfo) knownInfo += `\n- Negocio: ${state.businessType}`;
-    if (state.hasRevenueInfo) knownInfo += '\n- Tiene info de ventas';
-    if (state.hasAdsInfo) knownInfo += '\n- Invierte en publicidad';
-
-    return instructions + blockedQuestions + knownInfo;
+    return finalInstructions || 'Conversa natural para descubrir si califica para Datapify.';
   }
 
   /**
