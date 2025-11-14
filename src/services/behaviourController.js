@@ -36,9 +36,61 @@ class BehaviourController {
       shouldDescalify: false,
       descalifyReason: null,
       readyToPropose: false,
+
+      // 🔥 NUEVO: Detector de momento de intervención
+      hotLeadSignals: false,
+      interventionMoment: false,
     };
 
     const allText = history.map(h => h.content.toLowerCase()).join(' ');
+
+    // 🔥 DETECTOR DE MOMENTO DE INTERVENCIÓN (HOT LEAD)
+    // Señales de que el usuario está listo para solución inmediata
+    const hotLeadSignals = [
+      // Dolor explícito
+      'necesito ayuda',
+      'no me funciona',
+      'no funciona',
+      'mal',
+      'frustrad',
+      'cansad',
+      'harto',
+      'no vendo',
+      'no logro',
+      'no puedo',
+      'no estoy viendo resultados',
+      'no tengo resultados',
+
+      // Admisión de fracaso
+      'estoy invirtiendo y',
+      'estoy gastando',
+      'mis ventas están',
+      'mis ads no',
+      'mi publicidad no',
+      'nada me funciona',
+      'he probado todo',
+
+      // Intención explícita
+      'vi su anuncio',
+      'vi este anuncio',
+      'quiero saber si me pueden ayudar',
+      'me gustaría que me ayuden',
+      'pueden ayudarme',
+      'necesito que me ayuden',
+
+      // Urgencia
+      'lo antes posible',
+      'urgente',
+      'rápido',
+      'ya',
+    ];
+
+    // Detectar si hay señales de HOT LEAD en el último mensaje del usuario
+    const lastUserMessage = history.filter(h => h.role === 'user' || h.role === 'usuario').slice(-1)[0];
+    if (lastUserMessage) {
+      const userText = lastUserMessage.content.toLowerCase();
+      state.hotLeadSignals = hotLeadSignals.some(signal => userText.includes(signal));
+    }
 
     // Extraer nombre
     const namePatterns = [
@@ -116,18 +168,41 @@ class BehaviourController {
       if (text.includes('?')) state.questionsAsked++;
     });
 
-    // Determinar fase
-    if (state.messagesCount <= 2) {
-      state.phase = 'APERTURA';
-    } else if (!state.hasOnlineStore || !state.platform) {
-      state.phase = 'DESCUBRIMIENTO';
-    } else if (state.platform === 'shopify' && !state.hasBusinessInfo) {
-      state.phase = 'CALIFICACIÓN';
-    } else if (state.platform === 'shopify' && state.hasBusinessInfo && !state.alreadyOfferedMeeting) {
-      state.phase = 'PROPUESTA';
-      state.readyToPropose = true;
-    } else {
-      state.phase = 'CIERRE';
+    // 🔥 MOMENTO DE INTERVENCIÓN
+    // Si detecta HOT LEAD + mínimo contexto → saltar a PROPUESTA inmediata
+    if (state.hotLeadSignals) {
+      // Condiciones para intervención inmediata:
+      // 1. Tiene señales HOT
+      // 2. Ya sabemos que tiene tienda online o mencionó ecommerce/shopify
+      // 3. Mencionó publicidad/ads o problemas de ventas
+
+      const hasMinimalContext =
+        (state.hasOnlineStore || allText.includes('shopify') || allText.includes('tienda')) &&
+        (state.hasAdsInfo || allText.includes('publicidad') || allText.includes('ads') ||
+         allText.includes('ventas') || allText.includes('vender'));
+
+      if (hasMinimalContext) {
+        state.interventionMoment = true;
+        state.readyToPropose = true;
+        state.phase = 'PROPUESTA';
+        logger.info('🔥 MOMENTO DE INTERVENCIÓN detectado - Lead caliente con contexto suficiente');
+      }
+    }
+
+    // Determinar fase (solo si NO hay momento de intervención)
+    if (!state.interventionMoment) {
+      if (state.messagesCount <= 2) {
+        state.phase = 'APERTURA';
+      } else if (!state.hasOnlineStore || !state.platform) {
+        state.phase = 'DESCUBRIMIENTO';
+      } else if (state.platform === 'shopify' && !state.hasBusinessInfo) {
+        state.phase = 'CALIFICACIÓN';
+      } else if (state.platform === 'shopify' && state.hasBusinessInfo && !state.alreadyOfferedMeeting) {
+        state.phase = 'PROPUESTA';
+        state.readyToPropose = true;
+      } else {
+        state.phase = 'CIERRE';
+      }
     }
 
     return state;
@@ -178,7 +253,29 @@ Ejemplo: "¿Cómo te ha ido con las ventas?" o "¿Inviertes en publicidad?"
 SOLO una pregunta. Natural y empático.`;
     }
 
-    if (state.phase === 'PROPUESTA' && state.readyToPropose) {
+    // 🔥 MOMENTO DE INTERVENCIÓN (prioridad máxima)
+    if (state.interventionMoment) {
+      instructions = `🔥 MOMENTO DE INTERVENCIÓN - LEAD CALIENTE DETECTADO
+
+TU TAREA AHORA:
+Usuario expresó DOLOR + INTENCIÓN + ADMISIÓN DE FRACASO.
+NO sigas diagnosticando. NO hagas preguntas técnicas.
+
+RESPONDE ASÍ (estructura exacta):
+1. Valida el dolor brevemente (1 línea): "Uf, te cacho" o "Pucha, entiendo"
+2. Presenta Datapify como solución (1 línea): "Justo Datapify ayuda a tiendas Shopify que [problema del usuario]"
+3. Ofrece reunión (1 línea): "¿Te tinca que veamos tu caso en 30 min y te muestro cómo mejorar?"
+
+Ejemplo:
+"Uf, te cacho. Justo Datapify ayuda a tiendas Shopify que invierten en Meta Ads y no están viendo resultados. ¿Te tinca que veamos tu caso en 30 min y te muestro cómo mejorar?"
+
+IMPORTANTE:
+- NO preguntes más sobre su negocio
+- NO des consejos técnicos
+- NO expliques Datapify en detalle
+- SÉ directo y empático
+- Máximo 3 líneas`;
+    } else if (state.phase === 'PROPUESTA' && state.readyToPropose) {
       instructions = `TU TAREA AHORA:
 Usuario califica para reunión.
 Pregunta: "¿Te tinca que veamos tu caso en 30 min?"
