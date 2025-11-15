@@ -273,6 +273,20 @@ class CalendarService {
     else {
       formData.source = 'manual';
 
+      // Intentar extraer nombre desde el summary
+      // Formato común: "Onboarding Datapify (Nombre Apellido)"
+      const summaryNameMatch = summary.match(/\(([^)]+)\)/);
+      if (summaryNameMatch) {
+        const nombreCompleto = summaryNameMatch[1].trim();
+        const partes = nombreCompleto.split(' ');
+        if (partes.length >= 2) {
+          formData.nombre = partes[0];
+          formData.apellido = partes.slice(1).join(' ');
+        } else {
+          formData.nombre = nombreCompleto;
+        }
+      }
+
       // Intentar extraer teléfono de la descripción con regex
       const phoneRegex = /\+?\d[\d\s\-()]{8,}/;
       const phoneMatch = description.match(phoneRegex);
@@ -285,6 +299,17 @@ class CalendarService {
         const attendee = event.attendees.find(a => a.email && !a.organizer);
         if (attendee) {
           formData.email = attendee.email;
+        }
+      }
+
+      // Intentar extraer website de la descripción
+      // Buscar línea que diga "Sitio Web" o campos HTML
+      const websiteMatch = description.match(/<b>Sitio Web<\/b>\s*\n([^\n<]+)/);
+      if (websiteMatch) {
+        const website = websiteMatch[1].trim();
+        // Solo guardar si no es "Hola" u otros textos genéricos
+        if (website && website.length > 3 && !['hola', 'hello', 'hi'].includes(website.toLowerCase())) {
+          formData.sitioWeb = website;
         }
       }
     }

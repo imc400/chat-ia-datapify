@@ -101,13 +101,14 @@ class DashboardController {
 
           // SINCRONIZACIÓN AUTOMÁTICA: Actualizar CRM con datos del calendario
           if (reallyScheduled && calendarFormData && group.leadData) {
-            const needsUpdate =
-              !group.leadData.email ||
-              !group.leadData.website ||
-              !group.leadData.lastName ||
+            const hasNewData =
+              (calendarFormData.email && calendarFormData.email !== group.leadData.email) ||
+              (calendarFormData.sitioWeb && calendarFormData.sitioWeb !== group.leadData.website) ||
+              (calendarFormData.apellido && calendarFormData.apellido !== group.leadData.lastName) ||
+              (calendarFormData.nombre && calendarFormData.nombre !== group.leadData.name) ||
               !group.leadData.calendarSyncedAt;
 
-            if (needsUpdate) {
+            if (hasNewData) {
               logger.info('🔄 Sincronizando datos del calendario al CRM', { phone: group.phone });
 
               await prisma.leadData.update({
@@ -137,6 +138,34 @@ class DashboardController {
               group.leadData.lastName = calendarFormData.apellido || group.leadData.lastName;
               group.leadData.name = calendarFormData.nombre || group.leadData.name;
               group.leadData.calendarSyncedAt = new Date();
+            }
+
+            // ⭐ NUEVO: Actualizar scheduledMeeting en las conversaciones si aún no está marcado
+            const conversationsToUpdate = group.conversations.filter(c => !c.scheduledMeeting);
+            if (conversationsToUpdate.length > 0) {
+              logger.info('📅 Actualizando scheduledMeeting en conversaciones', {
+                phone: group.phone,
+                conversationsCount: conversationsToUpdate.length,
+              });
+
+              // Actualizar todas las conversaciones del grupo
+              await prisma.conversation.updateMany({
+                where: {
+                  id: { in: conversationsToUpdate.map(c => c.id) },
+                },
+                data: {
+                  scheduledMeeting: true,
+                  outcome: 'scheduled', // Cambiar outcome si aún está pending
+                },
+              });
+
+              // Actualizar el objeto en memoria para reflejar los cambios
+              group.conversations.forEach(c => {
+                c.scheduledMeeting = true;
+                if (c.outcome === 'pending') {
+                  c.outcome = 'scheduled';
+                }
+              });
             }
           }
         } catch (error) {
@@ -555,6 +584,56 @@ class DashboardController {
           if (calendarCheck.hasScheduled) {
             calendarData = calendarCheck.leadData;
             calendarEventCount = calendarCheck.eventCount;
+
+            // SINCRONIZACIÓN AUTOMÁTICA: Actualizar LeadData si el calendario tiene datos nuevos
+            const hasNewData =
+              (calendarData.email && calendarData.email !== lead.email) ||
+              (calendarData.sitioWeb && calendarData.sitioWeb !== lead.website) ||
+              (calendarData.apellido && calendarData.apellido !== lead.lastName) ||
+              (calendarData.nombre && calendarData.nombre !== lead.name) ||
+              !lead.calendarSyncedAt;
+
+            if (hasNewData) {
+              await prisma.leadData.update({
+                where: { phone: lead.phone },
+                data: {
+                  email: calendarData.email || lead.email,
+                  website: calendarData.sitioWeb || lead.website,
+                  lastName: calendarData.apellido || lead.lastName,
+                  name: calendarData.nombre || lead.name,
+                  calendarSyncedAt: new Date(),
+                },
+              });
+
+              // Actualizar el objeto lead en memoria
+              lead.email = calendarData.email || lead.email;
+              lead.website = calendarData.sitioWeb || lead.website;
+              lead.lastName = calendarData.apellido || lead.lastName;
+              lead.name = calendarData.nombre || lead.name;
+              lead.calendarSyncedAt = new Date();
+            }
+
+            // Actualizar scheduledMeeting en conversaciones si aún no está marcado
+            const conversationsToUpdate = lead.conversations.filter(c => !c.scheduledMeeting);
+            if (conversationsToUpdate.length > 0) {
+              await prisma.conversation.updateMany({
+                where: {
+                  id: { in: conversationsToUpdate.map(c => c.id) },
+                },
+                data: {
+                  scheduledMeeting: true,
+                  outcome: 'scheduled',
+                },
+              });
+
+              // Actualizar objetos en memoria
+              lead.conversations.forEach(c => {
+                c.scheduledMeeting = true;
+                if (c.outcome === 'pending') {
+                  c.outcome = 'scheduled';
+                }
+              });
+            }
           }
         } catch (error) {
           logger.warn('Error verificando calendario', error);
@@ -571,6 +650,9 @@ class DashboardController {
             : best;
         }, 'cold');
 
+        // ⭐ FUENTE DE VERDAD: Google Calendar (no solo la DB)
+        const reallyScheduled = calendarEventCount > 0 || hasScheduledMeeting;
+
         return {
           id: lead.id,
           phone: lead.phone,
@@ -586,7 +668,7 @@ class DashboardController {
           conversionDate: lead.conversionDate,
           conversionNotes: lead.conversionNotes,
           calendarSyncedAt: lead.calendarSyncedAt,
-          scheduledMeeting: hasScheduledMeeting,
+          scheduledMeeting: reallyScheduled, // ⭐ NUEVO: Usa calendario como fuente de verdad
           calendarEventCount,
           leadTemperature: bestTemperature,
           leadScore: bestLeadScore,
