@@ -134,11 +134,166 @@
       <!-- Page: Analytics (placeholder) -->
       <div id="page-analytics" class="page">
         <div class="page-header">
-          <h2 class="page-title">Analytics</h2>
-          <p class="page-subtitle">Próximamente...</p>
+          <h2 class="page-title">📊 Funnel de Conversión</h2>
+          <p class="page-subtitle">Análisis completo del rendimiento de ventas por etapas</p>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid" style="margin-bottom: 30px;">
+          <div class="stat-card">
+            <div class="stat-icon">💬</div>
+            <div class="stat-details">
+              <div class="stat-label">Total Chats</div>
+              <div class="stat-value" id="funnel-total-chats">-</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-details">
+              <div class="stat-label">Agendaron</div>
+              <div class="stat-value" id="funnel-scheduled">-</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔄</div>
+            <div class="stat-details">
+              <div class="stat-label">En Trial</div>
+              <div class="stat-value" id="funnel-trial">-</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-details">
+              <div class="stat-label">Clientes Pagando</div>
+              <div class="stat-value" id="funnel-paying">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Funnel Visualization -->
+        <div class="funnel-container">
+          <div class="funnel-stage" id="stage-1">
+            <div class="funnel-stage-header">
+              <span class="funnel-stage-number">1</span>
+              <span class="funnel-stage-title">Chats Iniciados</span>
+            </div>
+            <div class="funnel-stage-body">
+              <div class="funnel-stage-count" id="stage-1-count">-</div>
+              <div class="funnel-stage-percentage">100%</div>
+              <div class="funnel-stage-desc">Leads únicos que iniciaron conversación</div>
+            </div>
+          </div>
+
+          <div class="funnel-arrow">↓</div>
+          <div class="funnel-conversion-rate" id="conversion-1-2">-</div>
+
+          <div class="funnel-stage" id="stage-2">
+            <div class="funnel-stage-header">
+              <span class="funnel-stage-number">2</span>
+              <span class="funnel-stage-title">Agendaron Reunión</span>
+            </div>
+            <div class="funnel-stage-body">
+              <div class="funnel-stage-count" id="stage-2-count">-</div>
+              <div class="funnel-stage-percentage" id="stage-2-percentage">-</div>
+              <div class="funnel-stage-desc">Leads que agendaron una reunión</div>
+            </div>
+          </div>
+
+          <div class="funnel-arrow">↓</div>
+          <div class="funnel-conversion-rate" id="conversion-2-3">-</div>
+
+          <div class="funnel-split">
+            <div class="funnel-stage funnel-stage-split" id="stage-3">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-number">3A</span>
+                <span class="funnel-stage-title">Trial 14 Días</span>
+              </div>
+              <div class="funnel-stage-body">
+                <div class="funnel-stage-count" id="stage-3-count">-</div>
+                <div class="funnel-stage-percentage" id="stage-3-percentage">-</div>
+                <div class="funnel-stage-desc">Empezaron periodo de prueba</div>
+              </div>
+            </div>
+
+            <div class="funnel-stage funnel-stage-split" id="stage-4">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-number">3B</span>
+                <span class="funnel-stage-title">Pago Directo + Bonos</span>
+              </div>
+              <div class="funnel-stage-body">
+                <div class="funnel-stage-count" id="stage-4-count">-</div>
+                <div class="funnel-stage-percentage" id="stage-4-percentage">-</div>
+                <div class="funnel-stage-desc">Pagaron $199/mes sin trial</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="funnel-arrow">↓</div>
+          <div class="funnel-conversion-rate" id="conversion-3-5">-</div>
+
+          <div class="funnel-stage" id="stage-5">
+            <div class="funnel-stage-header">
+              <span class="funnel-stage-number">4</span>
+              <span class="funnel-stage-title">Pagaron Post-Trial</span>
+            </div>
+            <div class="funnel-stage-body">
+              <div class="funnel-stage-count" id="stage-5-count">-</div>
+              <div class="funnel-stage-percentage" id="stage-5-percentage">-</div>
+              <div class="funnel-stage-desc">Completaron trial y convirtieron</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversion Rates Summary -->
+        <div class="conversion-summary">
+          <h3 style="margin-bottom: 20px; color: #1a1a2e;">Tasas de Conversión</h3>
+          <div class="conversion-grid">
+            <div class="conversion-card">
+              <div class="conversion-label">Chat → Agendamiento</div>
+              <div class="conversion-value" id="rate-chat-schedule">-</div>
+              <div class="conversion-desc" id="desc-chat-schedule">-</div>
+            </div>
+            <div class="conversion-card">
+              <div class="conversion-label">Agendamiento → Conversión</div>
+              <div class="conversion-value" id="rate-schedule-conversion">-</div>
+              <div class="conversion-desc" id="desc-schedule-conversion">-</div>
+            </div>
+            <div class="conversion-card">
+              <div class="conversion-label">Trial → Pago</div>
+              <div class="conversion-value" id="rate-trial-payment">-</div>
+              <div class="conversion-desc" id="desc-trial-payment">-</div>
+            </div>
+            <div class="conversion-card">
+              <div class="conversion-label">Conversión Total</div>
+              <div class="conversion-value highlight" id="rate-overall">-</div>
+              <div class="conversion-desc" id="desc-overall">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenue Section -->
+        <div class="revenue-section">
+          <h3 style="margin-bottom: 20px; color: #1a1a2e;">💰 Revenue</h3>
+          <div class="revenue-grid">
+            <div class="revenue-card">
+              <div class="revenue-label">Clientes Pagando</div>
+              <div class="revenue-value" id="revenue-paying">-</div>
+            </div>
+            <div class="revenue-card">
+              <div class="revenue-label">Revenue por Cliente</div>
+              <div class="revenue-value" id="revenue-per-client">$199 USD</div>
+            </div>
+            <div class="revenue-card">
+              <div class="revenue-label">Revenue Total</div>
+              <div class="revenue-value highlight" id="revenue-total">-</div>
+            </div>
+            <div class="revenue-card">
+              <div class="revenue-label">Proyección Mensual</div>
+              <div class="revenue-value" id="revenue-monthly">-</div>
+            </div>
+          </div>
         </div>
       </div>
-
       <!-- Page: Leads -->
       <div id="page-leads" class="page">
         <div class="page-header">

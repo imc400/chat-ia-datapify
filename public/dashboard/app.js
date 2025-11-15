@@ -51,6 +51,8 @@ class DashboardApp {
         // Cargar datos según la página
         if (targetPage === 'leads') {
           this.loadLeadsPage();
+        } else if (targetPage === 'analytics') {
+          this.loadAnalyticsFunnel();
         }
       });
     });
@@ -652,6 +654,65 @@ class DashboardApp {
     // Puedes implementar un toast o notificación
     console.error(message);
     alert(message);
+  }
+
+  /**
+   * ==============================================
+   * PÁGINA DE ANALYTICS - FUNNEL DE CONVERSIÓN
+   * ==============================================
+   */
+
+  async loadAnalyticsFunnel() {
+    try {
+      const response = await fetch('/api/analytics/funnel');
+      const { data } = await response.json();
+
+      // Actualizar stats overview cards
+      document.getElementById('funnel-total-chats').textContent = data.summary.totalLeads;
+      document.getElementById('funnel-scheduled').textContent = data.summary.totalScheduled;
+      document.getElementById('funnel-trial').textContent = data.summary.totalTrial;
+      document.getElementById('funnel-paying').textContent = data.summary.totalConverted;
+
+      // Actualizar funnel stages
+      document.getElementById('stage-1-count').textContent = data.funnel.stage1_chats.count;
+
+      document.getElementById('stage-2-count').textContent = data.funnel.stage2_scheduled.count;
+      document.getElementById('stage-2-percentage').textContent = data.funnel.stage2_scheduled.percentage;
+      document.getElementById('conversion-1-2').textContent = data.funnel.stage2_scheduled.conversionFromPrevious;
+
+      document.getElementById('stage-3-count').textContent = data.funnel.stage3_trial.count;
+      document.getElementById('stage-3-percentage').textContent = data.funnel.stage3_trial.percentage;
+
+      document.getElementById('stage-4-count').textContent = data.funnel.stage4_paid_bonus.count;
+      document.getElementById('stage-4-percentage').textContent = data.funnel.stage4_paid_bonus.percentage;
+      document.getElementById('conversion-2-3').textContent = data.funnel.stage3_trial.conversionFromScheduled;
+
+      document.getElementById('stage-5-count').textContent = data.funnel.stage5_paid_after_trial.count;
+      document.getElementById('stage-5-percentage').textContent = data.funnel.stage5_paid_after_trial.percentage;
+      document.getElementById('conversion-3-5').textContent = data.funnel.stage5_paid_after_trial.conversionFromTrial;
+
+      // Actualizar conversion rates
+      document.getElementById('rate-chat-schedule').textContent = data.conversionRates.chatToSchedule.rate;
+      document.getElementById('desc-chat-schedule').textContent = data.conversionRates.chatToSchedule.description;
+
+      document.getElementById('rate-schedule-conversion').textContent = data.conversionRates.scheduleToConversion.rate;
+      document.getElementById('desc-schedule-conversion').textContent = data.conversionRates.scheduleToConversion.description;
+
+      document.getElementById('rate-trial-payment').textContent = data.conversionRates.trialToPayment.rate;
+      document.getElementById('desc-trial-payment').textContent = data.conversionRates.trialToPayment.description;
+
+      document.getElementById('rate-overall').textContent = data.conversionRates.overallConversion.rate;
+      document.getElementById('desc-overall').textContent = data.conversionRates.overallConversion.description;
+
+      // Actualizar revenue
+      document.getElementById('revenue-paying').textContent = data.revenue.totalPaying;
+      document.getElementById('revenue-per-client').textContent = data.revenue.revenuePerClient;
+      document.getElementById('revenue-total').textContent = data.revenue.totalRevenue;
+      document.getElementById('revenue-monthly').textContent = data.revenue.projectedMonthlyRevenue;
+
+    } catch (error) {
+      console.error('Error cargando funnel analytics:', error);
+    }
   }
 
   /**
