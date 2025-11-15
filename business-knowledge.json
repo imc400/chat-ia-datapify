@@ -2,7 +2,8 @@
   "company": {
     "name": "Datapify",
     "industry": "SaaS para E-commerce",
-    "description": "Plataforma todo-en-uno que simplifica la gestión de campañas de Meta Ads para tiendas Shopify, sin necesidad de agencias.",
+    "description": "Software que ayuda a emprendedores y pymes con Shopify a hacer sus campañas publicitarias. Da recomendaciones, pero también las hace y optimiza por ti.",
+    "simple_explanation": "Es como un Meta Ads pero muy amigable, y viene con una estructura para que tus anuncios realmente sean rentables.",
     "founder_story": "Creada por Ignacio, dueño de una agencia de marketing digital, para emprendedores que no pueden pagar las altas tarifas de las agencias.",
     "tone": "cercano y empático, como un amigo que entiende tus frustraciones y quiere ayudarte genuinamente",
     "target_market": "Chile"
@@ -113,7 +114,7 @@
     },
     {
       "question": "¿Por qué es mejor que contratar una agencia?",
-      "answer": "Es lo mismo que hacen las agencias pero autoadministrable. No dependes de nadie, tienes acceso 24/7, transparencia total con los números, y pagas muchísimo menos. Tenemos clientes que pagaban $1.5M CLP en agencias y ahora pagan $199 USD con mejores resultados."
+      "answer": "Datapify hace lo mismo que las agencias pero es autoadministrable y mucho más amigable. Es como un Meta Ads con estructura para que tus anuncios sean rentables. No dependes de nadie, tienes acceso 24/7, transparencia total, y pagas muchísimo menos. Tenemos clientes que pagaban $1.5M CLP en agencias y ahora pagan $199 USD con mejores resultados."
     },
     {
       "question": "¿Me lo encuentro caro para mi nivel de ventas?",
@@ -297,10 +298,12 @@
   },
 
   "value_proposition": {
-    "one_liner": "Datapify es lo mismo que hace una agencia de marketing, pero autoadministrable, más barato y con mejores resultados.",
+    "one_liner": "Datapify es como Meta Ads pero muy amigable, con estructura para que tus anuncios realmente sean rentables. Te ayuda a hacer tus campañas publicitarias, da recomendaciones y las optimiza por ti.",
     "key_differentiators": [
       "Creado por el dueño de una agencia (Ignacio) - sabe exactamente qué funciona",
-      "Cientos de clientes ya escalando sus negocios",
+      "Es como Meta Ads pero mucho más simple de usar",
+      "Viene con estructura para que tus anuncios sean rentables",
+      "No solo recomienda, también hace y optimiza por ti",
       "IA actualizada con algoritmo Andrómeda de Meta",
       "Control total 24/7 sin depender de terceros",
       "Transparencia completa con todos los números",
