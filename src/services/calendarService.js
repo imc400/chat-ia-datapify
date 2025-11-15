@@ -208,8 +208,94 @@ class CalendarService {
   }
 
   /**
+   * Extraer datos del formulario desde la descripción del evento
+   * Parsea: Nombre, Apellido, Correo, Teléfono, Sitio Web
+   */
+  extractEventFormData(event) {
+    const description = event.description || '';
+    const summary = event.summary || '';
+
+    // Patrón para eventos creados por el bot
+    // Formato: "Cliente: Juan Pérez\nTeléfono: +56912345678\nMotivo: Demo\n\nAgendado vía WhatsApp Bot"
+    const formData = {
+      nombre: null,
+      apellido: null,
+      email: null,
+      telefono: null,
+      sitioWeb: null,
+      source: null, // 'whatsapp_bot' o 'google_appointment' o 'manual'
+    };
+
+    // Identificar el origen del evento
+    if (description.includes('Agendado vía WhatsApp Bot')) {
+      formData.source = 'whatsapp_bot';
+
+      // Extraer nombre completo del campo "Cliente:"
+      const nombreMatch = description.match(/Cliente:\s*([^\n]+)/);
+      if (nombreMatch) {
+        const nombreCompleto = nombreMatch[1].trim();
+        const partes = nombreCompleto.split(' ');
+        if (partes.length >= 2) {
+          formData.nombre = partes[0];
+          formData.apellido = partes.slice(1).join(' ');
+        } else {
+          formData.nombre = nombreCompleto;
+        }
+      }
+
+      // Extraer teléfono
+      const telefonoMatch = description.match(/Teléfono:\s*([^\n]+)/);
+      if (telefonoMatch) {
+        formData.telefono = telefonoMatch[1].trim();
+      }
+
+      // Extraer email de attendees si existe
+      if (event.attendees && event.attendees.length > 0) {
+        const attendee = event.attendees.find(a => a.email && !a.organizer);
+        if (attendee) {
+          formData.email = attendee.email;
+        }
+      }
+    }
+    // Google Appointment Scheduling tiene estructura diferente
+    else if (event.extendedProperties && event.extendedProperties.private) {
+      formData.source = 'google_appointment';
+
+      // Google guarda los campos del formulario en extendedProperties
+      const props = event.extendedProperties.private;
+      formData.nombre = props.firstName || props.nombre || null;
+      formData.apellido = props.lastName || props.apellido || null;
+      formData.email = props.email || null;
+      formData.telefono = props.phone || props.telefono || null;
+      formData.sitioWeb = props.website || props.sitioWeb || null;
+    }
+    // Evento manual
+    else {
+      formData.source = 'manual';
+
+      // Intentar extraer teléfono de la descripción con regex
+      const phoneRegex = /\+?\d[\d\s\-()]{8,}/;
+      const phoneMatch = description.match(phoneRegex);
+      if (phoneMatch) {
+        formData.telefono = phoneMatch[0].trim();
+      }
+
+      // Extraer email de attendees
+      if (event.attendees && event.attendees.length > 0) {
+        const attendee = event.attendees.find(a => a.email && !a.organizer);
+        if (attendee) {
+          formData.email = attendee.email;
+        }
+      }
+    }
+
+    return formData;
+  }
+
+  /**
    * Verificar si un teléfono tiene eventos agendados en Google Calendar
    * Busca eventos futuros que contengan el teléfono en la descripción
+   * AHORA extrae y valida los datos del formulario de cada evento
    */
   async checkPhoneHasScheduledEvents(phone) {
     try {
@@ -227,23 +313,33 @@ class CalendarService {
 
       const events = response.data.items || [];
 
-      // Filtrar eventos que realmente contengan el teléfono
-      const matchingEvents = events.filter(event => {
-        const description = event.description || '';
-        const summary = event.summary || '';
-        const attendees = event.attendees || [];
+      // Filtrar y enriquecer eventos que realmente contengan el teléfono
+      const matchingEvents = events
+        .map(event => {
+          const formData = this.extractEventFormData(event);
 
-        // Buscar el teléfono en descripción, título o asistentes
-        return description.includes(phone) ||
-               summary.includes(phone) ||
-               attendees.some(a => a.email && a.email.includes(phone));
-      });
+          // Normalizar teléfonos para comparación (quitar espacios, guiones, etc)
+          const normalizePhone = (p) => p ? p.replace(/[\s\-()]/g, '') : '';
+          const eventPhone = normalizePhone(formData.telefono);
+          const searchPhone = normalizePhone(phone);
+
+          // Verificar si el teléfono coincide
+          const phoneMatches = eventPhone.includes(searchPhone) || searchPhone.includes(eventPhone);
+
+          return {
+            ...event,
+            formData,
+            phoneMatches,
+          };
+        })
+        .filter(event => event.phoneMatches);
 
       if (matchingEvents.length > 0) {
         logger.info('✅ Teléfono tiene eventos agendados', {
           phone,
           eventCount: matchingEvents.length,
           nextEvent: matchingEvents[0].start.dateTime,
+          extractedData: matchingEvents[0].formData,
         });
 
         return {
@@ -251,6 +347,8 @@ class CalendarService {
           eventCount: matchingEvents.length,
           nextEvent: matchingEvents[0],
           allEvents: matchingEvents,
+          // Datos del primer evento para referencia
+          leadData: matchingEvents[0].formData,
         };
       }
 

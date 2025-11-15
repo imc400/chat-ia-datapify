@@ -316,6 +316,7 @@ class DashboardApp {
 
     const leadData = data.leadData || {};
     const summary = data.summary;
+    const calendarData = data.calendarFormData; // NUEVO: Datos del calendario
 
     container.innerHTML = `
       <div class="info-panel-toggle" id="info-toggle">
@@ -325,8 +326,36 @@ class DashboardApp {
         <div class="info-panel-toggle-icon">▼</div>
       </div>
       <div class="info-panel-content" id="info-content">
+        ${calendarData ? `
+        <div class="info-section" style="background: #dcfce7; border-left: 4px solid #16a34a;">
+          <h4>✅ Datos del Calendario (${data.calendarEventCount} evento${data.calendarEventCount > 1 ? 's' : ''})</h4>
+          <div class="info-item">
+            <span class="info-label">Nombre:</span>
+            <span class="info-value">${calendarData.nombre || '-'} ${calendarData.apellido || ''}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Email:</span>
+            <span class="info-value">${calendarData.email || 'No proporcionado'}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Teléfono:</span>
+            <span class="info-value">${calendarData.telefono || 'No proporcionado'}</span>
+          </div>
+          ${calendarData.sitioWeb ? `
+          <div class="info-item">
+            <span class="info-label">Sitio Web:</span>
+            <span class="info-value">${calendarData.sitioWeb}</span>
+          </div>
+          ` : ''}
+          <div class="info-item">
+            <span class="info-label">Origen:</span>
+            <span class="info-value">${calendarData.source === 'whatsapp_bot' ? '💬 WhatsApp Bot' : calendarData.source === 'google_appointment' ? '📅 Google Appointment' : '✏️ Manual'}</span>
+          </div>
+        </div>
+        ` : ''}
+
         <div class="info-section">
-        <h4>Información del Lead</h4>
+        <h4>Información del Lead (CRM)</h4>
         <div class="info-item">
           <span class="info-label">Nombre:</span>
           <span class="info-value">${leadData.name || 'No especificado'}</span>

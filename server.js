@@ -7,6 +7,7 @@ const webhookRoutes = require('./src/routes/webhook');
 const oauthRoutes = require('./src/routes/oauth');
 const analyticsRoutes = require('./src/routes/analytics');
 const dashboardRoutes = require('./src/routes/dashboard');
+const testCalendarRoutes = require('./src/routes/test-calendar');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,7 @@ app.use('/webhook', webhookRoutes);
 app.use('/oauth', oauthRoutes);
 app.use('/api/analytics', analyticsRoutes); // NUEVO: Dashboard de aprendizaje
 app.use('/api/dashboard', dashboardRoutes); // NUEVO: Dashboard API
+app.use('/test-calendar', testCalendarRoutes); // TEST: Ver eventos de calendario
 
 // Ruta de salud
 app.get('/health', (req, res) => {

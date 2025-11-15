@@ -91,11 +91,13 @@ class DashboardController {
         // Verificar si tiene evento REAL en Google Calendar
         let reallyScheduled = false;
         let calendarEventCount = 0;
+        let calendarFormData = null; // NUEVO: Datos extraídos del calendario
 
         try {
           const calendarCheck = await calendarService.checkPhoneHasScheduledEvents(group.phone);
           reallyScheduled = calendarCheck.hasScheduled;
           calendarEventCount = calendarCheck.eventCount;
+          calendarFormData = calendarCheck.leadData || null; // NUEVO: Extraer datos del formulario
         } catch (error) {
           logger.warn('Error verificando calendario para', group.phone, error.message);
         }
@@ -110,6 +112,7 @@ class DashboardController {
           leadScore: group.leadScore,
           scheduledMeeting: reallyScheduled, // Ahora es verificación REAL
           calendarEventCount: calendarEventCount, // Cantidad de eventos en calendario
+          calendarFormData: calendarFormData, // NUEVO: Datos del formulario extraídos de Google Calendar
           startedAt: group.conversations[group.conversations.length - 1].startedAt,
           updatedAt: group.lastUpdate,
           lastMessage: group.lastMessage,
@@ -192,6 +195,19 @@ class DashboardController {
       const bestLeadScore = Math.max(...conversations.map(c => c.leadScore));
       const hasScheduledMeeting = conversations.some(c => c.scheduledMeeting);
 
+      // NUEVO: Verificar calendario y extraer datos del formulario
+      let calendarFormData = null;
+      let calendarEventCount = 0;
+      try {
+        const calendarCheck = await calendarService.checkPhoneHasScheduledEvents(phone);
+        if (calendarCheck.hasScheduled) {
+          calendarFormData = calendarCheck.leadData;
+          calendarEventCount = calendarCheck.eventCount;
+        }
+      } catch (error) {
+        logger.warn('Error verificando calendario para', phone, error.message);
+      }
+
       res.json({
         success: true,
         data: {
@@ -206,6 +222,8 @@ class DashboardController {
           })),
           messages: allMessages,
           leadData: latestLeadData,
+          calendarFormData: calendarFormData, // NUEVO: Datos extraídos del calendario
+          calendarEventCount: calendarEventCount, // NUEVO: Cantidad de eventos
           summary: {
             totalConversations,
             totalMessages,
