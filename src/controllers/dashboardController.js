@@ -710,7 +710,7 @@ class DashboardController {
       const { conversionStatus, conversionNotes } = req.body;
 
       // Validar estado
-      const validStatuses = ['trial_14_days', 'paid_monthly_bonus', 'paid_after_trial', 'none'];
+      const validStatuses = ['trial_14_days', 'trial_completed_no_payment', 'paid_monthly_bonus', 'paid_after_trial', 'none'];
       if (!validStatuses.includes(conversionStatus)) {
         return res.status(400).json({
           success: false,
@@ -770,6 +770,7 @@ class DashboardController {
       const [
         totalLeads,
         trial14Days,
+        trialCompletedNoPayment,
         paidMonthlyBonus,
         paidAfterTrial,
         withShopify,
@@ -777,6 +778,7 @@ class DashboardController {
       ] = await Promise.all([
         prisma.leadData.count(),
         prisma.leadData.count({ where: { conversionStatus: 'trial_14_days' } }),
+        prisma.leadData.count({ where: { conversionStatus: 'trial_completed_no_payment' } }),
         prisma.leadData.count({ where: { conversionStatus: 'paid_monthly_bonus' } }),
         prisma.leadData.count({ where: { conversionStatus: 'paid_after_trial' } }),
         prisma.leadData.count({ where: { hasShopify: true } }),
@@ -793,9 +795,10 @@ class DashboardController {
           totalLeads,
           byStatus: {
             trial_14_days: trial14Days,
+            trial_completed_no_payment: trialCompletedNoPayment,
             paid_monthly_bonus: paidMonthlyBonus,
             paid_after_trial: paidAfterTrial,
-            none: totalLeads - trial14Days - paidMonthlyBonus - paidAfterTrial,
+            none: totalLeads - trial14Days - trialCompletedNoPayment - paidMonthlyBonus - paidAfterTrial,
           },
           metrics: {
             withShopify,
