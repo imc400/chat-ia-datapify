@@ -186,22 +186,43 @@ class ConversationService {
 
   /**
    * Extrae y guarda datos del lead automáticamente
+   * ⭐ NUEVO: Ahora basado en teléfono (no en conversationId)
    */
   async updateLeadData(conversationId, data) {
     try {
+      // 1. Obtener el teléfono de la conversación
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { phone: true },
+      });
+
+      if (!conversation) {
+        throw new Error(`Conversación ${conversationId} no encontrada`);
+      }
+
+      const phone = conversation.phone;
+
+      // 2. Upsert el LeadData basado en el teléfono
       const leadData = await prisma.leadData.upsert({
-        where: { conversationId },
+        where: { phone },
         update: {
           ...data,
           updatedAt: new Date(),
         },
         create: {
-          conversationId,
+          phone,
           ...data,
         },
       });
 
+      // 3. Actualizar la conversación para apuntar al lead
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { leadDataId: leadData.id },
+      });
+
       logger.info('📊 Datos del lead actualizados', {
+        phone,
         conversationId,
         hasShopify: data.hasShopify,
         monthlyRevenue: data.monthlyRevenueCLP,
@@ -210,6 +231,7 @@ class ConversationService {
       return leadData;
     } catch (error) {
       logger.error('Error actualizando datos del lead:', error);
+      throw error;
     }
   }
 

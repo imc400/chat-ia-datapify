@@ -17,6 +17,7 @@ datasource db {
 model Conversation {
   id                String   @id @default(uuid())
   phone             String   // WhatsApp del usuario
+  leadDataId        String?  // ⭐ NUEVO: Foreign key al LeadData compartido
   startedAt         DateTime @default(now())
   endedAt           DateTime?
   status            String   @default("active") // 'active', 'completed', 'abandoned'
@@ -29,10 +30,11 @@ model Conversation {
 
   // Relaciones
   messages          Message[]
-  leadData          LeadData?
+  leadData          LeadData? @relation(fields: [leadDataId], references: [id])
   analytics         ConversationAnalytics?
 
   @@index([phone])
+  @@index([leadDataId])
   @@index([createdAt])
   @@index([outcome])
   @@index([leadTemperature])
@@ -57,10 +59,12 @@ model Message {
 // ========================================
 // DATOS DEL LEAD (Extracción automática)
 // ========================================
+// NUEVO DISEÑO: Un lead por teléfono (no por conversación)
+// Múltiples conversaciones pueden pertenecer al mismo lead
 
 model LeadData {
   id                    String   @id @default(uuid())
-  conversationId        String   @unique
+  phone                 String   @unique  // ⭐ Un teléfono = un lead (consolidado)
   name                  String?
   businessType          String?
   hasShopify            Boolean?
@@ -85,10 +89,10 @@ model LeadData {
   extractedAt           DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  // Relaciones
-  conversation          Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  // Relaciones: Un lead puede tener muchas conversaciones
+  conversations         Conversation[]
 
-  @@index([conversationId])
+  @@index([phone])
   @@index([hasShopify])
   @@index([monthlyRevenueCLP])
   @@index([conversionStatus])

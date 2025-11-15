@@ -111,7 +111,7 @@ class DashboardController {
               logger.info('🔄 Sincronizando datos del calendario al CRM', { phone: group.phone });
 
               await prisma.leadData.update({
-                where: { id: group.leadData.id },
+                where: { phone: group.phone }, // ⭐ NUEVO: Actualizar por teléfono
                 data: {
                   email: calendarFormData.email || group.leadData.email,
                   website: calendarFormData.sitioWeb || group.leadData.website,
@@ -257,7 +257,7 @@ class DashboardController {
               logger.info('🔄 Sincronizando datos del calendario al CRM', { phone });
 
               await prisma.leadData.update({
-                where: { id: latestLeadData.id },
+                where: { phone }, // ⭐ NUEVO: Actualizar por teléfono
                 data: {
                   email: calendarFormData.email || latestLeadData.email,
                   website: calendarFormData.sitioWeb || latestLeadData.website,
@@ -518,17 +518,18 @@ class DashboardController {
         leadWhere.hasShopify = true;
       }
 
-      // Obtener leads con sus conversaciones
+      // Obtener leads con sus conversaciones (⭐ NUEVO: conversations es plural ahora)
       const leads = await prisma.leadData.findMany({
         where: leadWhere,
         include: {
-          conversation: {
+          conversations: {
             include: {
               messages: {
                 orderBy: { timestamp: 'desc' },
                 take: 1,
               },
             },
+            orderBy: { updatedAt: 'desc' },
           },
         },
         orderBy: { [sortBy]: sortOrder },
@@ -539,7 +540,9 @@ class DashboardController {
       // Filtrar por scheduled si se especifica
       let filteredLeads = leads;
       if (scheduled === 'true') {
-        filteredLeads = leads.filter(lead => lead.conversation.scheduledMeeting);
+        filteredLeads = leads.filter(lead =>
+          lead.conversations.some(conv => conv.scheduledMeeting)
+        );
       }
 
       // Enriquecer con datos del calendario
@@ -548,7 +551,7 @@ class DashboardController {
         let calendarEventCount = 0;
 
         try {
-          const calendarCheck = await calendarService.checkPhoneHasScheduledEvents(lead.conversation.phone);
+          const calendarCheck = await calendarService.checkPhoneHasScheduledEvents(lead.phone);
           if (calendarCheck.hasScheduled) {
             calendarData = calendarCheck.leadData;
             calendarEventCount = calendarCheck.eventCount;
@@ -557,9 +560,20 @@ class DashboardController {
           logger.warn('Error verificando calendario', error);
         }
 
+        // Tomar la conversación más reciente para métricas
+        const latestConv = lead.conversations[0] || null;
+        const hasScheduledMeeting = lead.conversations.some(c => c.scheduledMeeting);
+        const bestLeadScore = Math.max(...lead.conversations.map(c => c.leadScore), 0);
+        const bestTemperature = lead.conversations.reduce((best, c) => {
+          const tempPriority = { hot: 3, warm: 2, cold: 1 };
+          return (tempPriority[c.leadTemperature] || 0) > (tempPriority[best] || 0)
+            ? c.leadTemperature
+            : best;
+        }, 'cold');
+
         return {
           id: lead.id,
-          phone: lead.conversation.phone,
+          phone: lead.phone,
           name: lead.name,
           lastName: lead.lastName,
           email: lead.email,
@@ -572,11 +586,12 @@ class DashboardController {
           conversionDate: lead.conversionDate,
           conversionNotes: lead.conversionNotes,
           calendarSyncedAt: lead.calendarSyncedAt,
-          scheduledMeeting: lead.conversation.scheduledMeeting,
+          scheduledMeeting: hasScheduledMeeting,
           calendarEventCount,
-          leadTemperature: lead.conversation.leadTemperature,
-          leadScore: lead.conversation.leadScore,
-          lastMessage: lead.conversation.messages[0],
+          leadTemperature: bestTemperature,
+          leadScore: bestLeadScore,
+          lastMessage: latestConv?.messages[0] || null,
+          conversationCount: lead.conversations.length,
           updatedAt: lead.updatedAt,
           createdAt: lead.extractedAt,
         };
@@ -637,7 +652,7 @@ class DashboardController {
 
       // Actualizar leadData
       const updatedLead = await prisma.leadData.update({
-        where: { id: conversation.leadData.id },
+        where: { phone }, // ⭐ NUEVO: Actualizar por teléfono
         data: {
           conversionStatus,
           conversionDate: conversionStatus !== 'none' ? new Date() : null,
