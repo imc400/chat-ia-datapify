@@ -196,6 +196,17 @@ class CalendarService {
         }
       }
 
+      logger.info('📅 Horarios disponibles obtenidos', {
+        count: availableSlots.length,
+      });
+
+      return availableSlots;
+    } catch (error) {
+      logger.error('Error obteniendo horarios disponibles:', error);
+      return [];
+    }
+  }
+
   /**
    * Verificar si un teléfono tiene eventos agendados en Google Calendar
    * Busca eventos futuros que contengan el teléfono en la descripción
@@ -263,16 +274,6 @@ class CalendarService {
     }
   }
 
-      logger.info('📅 Horarios disponibles obtenidos', {
-        count: availableSlots.length,
-      });
-
-      return availableSlots;
-    } catch (error) {
-      logger.error('Error obteniendo horarios disponibles:', error);
-      throw error;
-    }
-  }
 
   /**
    * Cancela un evento
