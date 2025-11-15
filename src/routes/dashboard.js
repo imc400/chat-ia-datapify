@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 
-// GET /api/dashboard/conversations - Obtener todas las conversaciones
+// GET /api/dashboard/conversations - Obtener todas las conversaciones (agrupadas por teléfono)
 router.get('/conversations', dashboardController.getConversations);
+
+// GET /api/dashboard/phone/:phone - Obtener todas las conversaciones de un teléfono (historial completo)
+router.get('/phone/:phone', dashboardController.getConversationsByPhone);
 
 // GET /api/dashboard/conversations/:id - Obtener una conversación específica con mensajes
 router.get('/conversations/:id', dashboardController.getConversationById);

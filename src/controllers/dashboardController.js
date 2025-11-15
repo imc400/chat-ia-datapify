@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 class DashboardController {
   /**
-   * Obtener todas las conversaciones con información resumida
+   * Obtener todas las conversaciones AGRUPADAS POR TELÉFONO
    */
   async getConversations(req, res) {
     try {
@@ -15,7 +15,8 @@ class DashboardController {
       if (status) where.status = status;
       if (temperature) where.leadTemperature = temperature;
 
-      const conversations = await prisma.conversation.findMany({
+      // Obtener todas las conversaciones
+      const allConversations = await prisma.conversation.findMany({
         where,
         include: {
           messages: {
@@ -26,43 +27,182 @@ class DashboardController {
           analytics: true,
         },
         orderBy: { updatedAt: 'desc' },
-        take: parseInt(limit),
-        skip: parseInt(offset),
       });
 
-      // Contar total para paginación
-      const total = await prisma.conversation.count({ where });
+      // Agrupar por teléfono
+      const groupedByPhone = {};
+      allConversations.forEach(conv => {
+        if (!groupedByPhone[conv.phone]) {
+          groupedByPhone[conv.phone] = {
+            phone: conv.phone,
+            conversations: [],
+            lastMessage: null,
+            lastUpdate: conv.updatedAt,
+            totalMessages: 0,
+            leadData: null,
+            leadTemperature: conv.leadTemperature,
+            leadScore: conv.leadScore,
+            scheduledMeeting: false,
+          };
+        }
+
+        groupedByPhone[conv.phone].conversations.push(conv);
+        groupedByPhone[conv.phone].totalMessages += conv.analytics?.totalMessages || 0;
+
+        // Actualizar última actividad si es más reciente
+        if (new Date(conv.updatedAt) > new Date(groupedByPhone[conv.phone].lastUpdate)) {
+          groupedByPhone[conv.phone].lastUpdate = conv.updatedAt;
+          groupedByPhone[conv.phone].lastMessage = conv.messages[0] || null;
+        }
+
+        // Tomar el leadData más reciente
+        if (conv.leadData && (!groupedByPhone[conv.phone].leadData ||
+            new Date(conv.leadData.updatedAt) > new Date(groupedByPhone[conv.phone].leadData.updatedAt))) {
+          groupedByPhone[conv.phone].leadData = conv.leadData;
+        }
+
+        // Tomar la mejor temperatura (hot > warm > cold)
+        const tempPriority = { hot: 3, warm: 2, cold: 1 };
+        if (tempPriority[conv.leadTemperature] > tempPriority[groupedByPhone[conv.phone].leadTemperature]) {
+          groupedByPhone[conv.phone].leadTemperature = conv.leadTemperature;
+        }
+
+        // Tomar el mejor leadScore
+        if (conv.leadScore > groupedByPhone[conv.phone].leadScore) {
+          groupedByPhone[conv.phone].leadScore = conv.leadScore;
+        }
+
+        // Si alguna conversación tiene reunión agendada, marcar
+        if (conv.scheduledMeeting) {
+          groupedByPhone[conv.phone].scheduledMeeting = true;
+        }
+      });
+
+      // Convertir a array y ordenar por última actividad
+      const grouped = Object.values(groupedByPhone)
+        .sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
+
+      // Aplicar paginación
+      const paginated = grouped.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
 
       // Formatear respuesta
-      const formatted = conversations.map(conv => ({
-        id: conv.id,
-        phone: conv.phone,
-        status: conv.status,
-        outcome: conv.outcome,
-        leadTemperature: conv.leadTemperature,
-        leadScore: conv.leadScore,
-        scheduledMeeting: conv.scheduledMeeting,
-        startedAt: conv.startedAt,
-        updatedAt: conv.updatedAt,
-        lastMessage: conv.messages[0] || null,
-        leadData: conv.leadData,
-        messageCount: conv.analytics?.totalMessages || 0,
-        unreadCount: 0, // Por ahora, después puedes agregar lógica de "leído"
+      const formatted = paginated.map(group => ({
+        phone: group.phone,
+        conversationCount: group.conversations.length,
+        conversationIds: group.conversations.map(c => c.id),
+        status: group.conversations[0].status,
+        outcome: group.conversations[0].outcome,
+        leadTemperature: group.leadTemperature,
+        leadScore: group.leadScore,
+        scheduledMeeting: group.scheduledMeeting,
+        startedAt: group.conversations[group.conversations.length - 1].startedAt, // Primera conversación
+        updatedAt: group.lastUpdate,
+        lastMessage: group.lastMessage,
+        leadData: group.leadData,
+        messageCount: group.totalMessages,
+        unreadCount: 0,
       }));
 
       res.json({
         success: true,
         data: formatted,
         pagination: {
-          total,
+          total: grouped.length,
           limit: parseInt(limit),
           offset: parseInt(offset),
-          hasMore: offset + limit < total,
+          hasMore: offset + limit < grouped.length,
         },
       });
 
     } catch (error) {
       logger.error('Error obteniendo conversaciones:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error obteniendo conversaciones',
+      });
+    }
+  }
+
+  /**
+   * Obtener TODAS las conversaciones de un teléfono (historial completo)
+   */
+  async getConversationsByPhone(req, res) {
+    try {
+      const { phone } = req.params;
+
+      // Obtener todas las conversaciones del teléfono
+      const conversations = await prisma.conversation.findMany({
+        where: { phone },
+        include: {
+          messages: {
+            orderBy: { timestamp: 'asc' },
+          },
+          leadData: true,
+          analytics: true,
+        },
+        orderBy: { startedAt: 'asc' }, // Ordenar cronológicamente
+      });
+
+      if (conversations.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No se encontraron conversaciones para este teléfono',
+        });
+      }
+
+      // Combinar todos los mensajes en orden cronológico
+      const allMessages = [];
+      conversations.forEach(conv => {
+        conv.messages.forEach(msg => {
+          allMessages.push({
+            ...msg,
+            conversationId: conv.id,
+            conversationStartedAt: conv.startedAt,
+          });
+        });
+      });
+
+      // Ordenar todos los mensajes por timestamp
+      allMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      // Obtener el leadData más reciente
+      const latestLeadData = conversations
+        .filter(c => c.leadData)
+        .sort((a, b) => new Date(b.leadData.updatedAt) - new Date(a.leadData.updatedAt))[0]?.leadData;
+
+      // Calcular estadísticas totales
+      const totalMessages = allMessages.length;
+      const totalConversations = conversations.length;
+      const bestLeadScore = Math.max(...conversations.map(c => c.leadScore));
+      const hasScheduledMeeting = conversations.some(c => c.scheduledMeeting);
+
+      res.json({
+        success: true,
+        data: {
+          phone,
+          conversations: conversations.map(c => ({
+            id: c.id,
+            startedAt: c.startedAt,
+            endedAt: c.endedAt,
+            status: c.status,
+            outcome: c.outcome,
+            messageCount: c.messages.length,
+          })),
+          messages: allMessages,
+          leadData: latestLeadData,
+          summary: {
+            totalConversations,
+            totalMessages,
+            bestLeadScore,
+            hasScheduledMeeting,
+            firstContact: conversations[0].startedAt,
+            lastActivity: conversations[conversations.length - 1].updatedAt,
+          },
+        },
+      });
+
+    } catch (error) {
+      logger.error('Error obteniendo conversaciones por teléfono:', error);
       res.status(500).json({
         success: false,
         error: 'Error obteniendo conversaciones',

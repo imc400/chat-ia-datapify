@@ -404,6 +404,15 @@ body {
   font-weight: 600;
 }
 
+.conversation-count-badge {
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 /* Messages Panel */
 .messages-panel {
   background: white;
@@ -442,6 +451,12 @@ body {
 .contact-phone {
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.contact-subtext {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
 }
 
 .messages-container {
@@ -500,6 +515,41 @@ body {
   font-size: 11px;
   color: var(--text-tertiary);
   padding: 0 8px;
+}
+
+/* Conversation Separator */
+.conversation-separator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  text-align: center;
+}
+
+.separator-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.separator-text {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.conversation-timeline-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+}
+
+.conversation-timeline-item:last-child {
+  border-bottom: none;
 }
 
 .conversation-info-panel {

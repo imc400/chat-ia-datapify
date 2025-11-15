@@ -111,7 +111,7 @@ class DashboardApp {
   }
 
   /**
-   * Renderizar lista de conversaciones
+   * Renderizar lista de conversaciones (agrupadas por teléfono)
    */
   renderConversations(conversations) {
     const container = document.getElementById('conversations-list');
@@ -122,7 +122,7 @@ class DashboardApp {
     }
 
     container.innerHTML = conversations.map(conv => `
-      <div class="conversation-item" data-id="${conv.id}">
+      <div class="conversation-item" data-phone="${conv.phone}">
         <div class="conversation-item-header">
           <span class="conversation-phone">${this.formatPhone(conv.phone)}</span>
           <span class="conversation-time">${this.formatTime(conv.updatedAt)}</span>
@@ -132,6 +132,7 @@ class DashboardApp {
         </div>
         <div class="conversation-meta">
           <span class="lead-badge ${conv.leadTemperature}">${this.formatTemperature(conv.leadTemperature)}</span>
+          ${conv.conversationCount > 1 ? `<span class="conversation-count-badge">${conv.conversationCount} conversaciones</span>` : ''}
           ${conv.scheduledMeeting ? '<span class="meeting-badge">📅 Reunión</span>' : ''}
         </div>
       </div>
@@ -140,7 +141,7 @@ class DashboardApp {
     // Agregar event listeners después de renderizar
     container.querySelectorAll('.conversation-item').forEach(item => {
       item.addEventListener('click', () => {
-        this.selectConversation(item.dataset.id);
+        this.selectConversationByPhone(item.dataset.phone);
       });
     });
   }
@@ -165,7 +166,32 @@ class DashboardApp {
   }
 
   /**
-   * Seleccionar una conversación y cargar sus mensajes
+   * Seleccionar conversación por teléfono (historial completo)
+   */
+  async selectConversationByPhone(phone) {
+    try {
+      // Marcar como activa
+      document.querySelectorAll('.conversation-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      document.querySelector(`[data-phone="${phone}"]`).classList.add('active');
+
+      // Cargar historial completo del teléfono
+      const response = await fetch(`/api/dashboard/phone/${phone}`);
+      const { data } = await response.json();
+
+      this.currentConversation = data;
+      this.renderPhoneHistory(data);
+      this.renderPhoneInfo(data);
+
+    } catch (error) {
+      console.error('Error cargando historial:', error);
+      this.showError('No se pudo cargar el historial');
+    }
+  }
+
+  /**
+   * LEGACY: Seleccionar una conversación individual
    */
   async selectConversation(conversationId) {
     try {
@@ -173,7 +199,6 @@ class DashboardApp {
       document.querySelectorAll('.conversation-item').forEach(item => {
         item.classList.remove('active');
       });
-      document.querySelector(`[data-id="${conversationId}"]`).classList.add('active');
 
       // Cargar conversación completa
       const response = await fetch(`/api/dashboard/conversations/${conversationId}`);
@@ -187,6 +212,150 @@ class DashboardApp {
       console.error('Error cargando conversación:', error);
       this.showError('No se pudo cargar la conversación');
     }
+  }
+
+  /**
+   * Renderizar historial completo de un teléfono (todas las conversaciones)
+   */
+  renderPhoneHistory(data) {
+    const header = document.getElementById('messages-header');
+    const container = document.getElementById('messages-container');
+
+    // Header con información del teléfono
+    header.innerHTML = `
+      <div class="contact-header">
+        <div class="contact-info">
+          <h3>${data.leadData?.name || 'Usuario'}</h3>
+          <p class="contact-phone">${this.formatPhone(data.phone)}</p>
+          <p class="contact-subtext">${data.summary.totalConversations} conversaciones • ${data.summary.totalMessages} mensajes</p>
+        </div>
+        <div class="conversation-meta">
+          <span class="lead-badge hot">
+            Score: ${data.summary.bestLeadScore}/10
+          </span>
+        </div>
+      </div>
+    `;
+
+    // Mensajes con separadores de conversación
+    if (data.messages.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay mensajes</div>';
+      return;
+    }
+
+    let html = '';
+    let lastConversationId = null;
+
+    data.messages.forEach((msg, index) => {
+      // Agregar separador cuando cambia la conversación
+      if (msg.conversationId !== lastConversationId) {
+        const conv = data.conversations.find(c => c.id === msg.conversationId);
+        if (index > 0) {
+          html += `
+            <div class="conversation-separator">
+              <span class="separator-line"></span>
+              <span class="separator-text">Nueva conversación - ${this.formatFullTime(conv.startedAt)}</span>
+              <span class="separator-line"></span>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="conversation-separator">
+              <span class="separator-text">Primera conversación - ${this.formatFullTime(conv.startedAt)}</span>
+            </div>
+          `;
+        }
+        lastConversationId = msg.conversationId;
+      }
+
+      html += `
+        <div class="message ${msg.role}">
+          <div class="message-avatar">${msg.role === 'user' ? 'U' : 'A'}</div>
+          <div class="message-content">
+            <div class="message-bubble">${this.escapeHtml(msg.content)}</div>
+            <div class="message-time">${this.formatFullTime(msg.timestamp)}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    container.scrollTop = container.scrollHeight;
+  }
+
+  /**
+   * Renderizar información del teléfono (lead)
+   */
+  renderPhoneInfo(data) {
+    const container = document.getElementById('conversation-info');
+
+    const leadData = data.leadData || {};
+    const summary = data.summary;
+
+    container.innerHTML = `
+      <div class="info-section">
+        <h4>Información del Lead</h4>
+        <div class="info-item">
+          <span class="info-label">Nombre:</span>
+          <span class="info-value">${leadData.name || 'No especificado'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Negocio:</span>
+          <span class="info-value">${leadData.businessType || 'No especificado'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Tiene Shopify:</span>
+          <span class="info-value">${leadData.hasShopify === true ? '✅ Sí' : leadData.hasShopify === false ? '❌ No' : '❓ Desconocido'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Invierte en Ads:</span>
+          <span class="info-value">${leadData.investsInAds ? '✅ Sí' : '❌ No'}</span>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <h4>Historial</h4>
+        <div class="info-item">
+          <span class="info-label">Conversaciones:</span>
+          <span class="info-value">${summary.totalConversations}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Total mensajes:</span>
+          <span class="info-value">${summary.totalMessages}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Lead Score:</span>
+          <span class="info-value">${summary.bestLeadScore}/10</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Reunión agendada:</span>
+          <span class="info-value">${summary.hasScheduledMeeting ? '✅ Sí' : '❌ No'}</span>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <h4>Timeline</h4>
+        <div class="info-item">
+          <span class="info-label">Primer contacto:</span>
+          <span class="info-value">${this.formatFullTime(summary.firstContact)}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Última actividad:</span>
+          <span class="info-value">${this.formatFullTime(summary.lastActivity)}</span>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <h4>Conversaciones individuales</h4>
+        ${data.conversations.map((conv, i) => `
+          <div class="conversation-timeline-item">
+            <strong>Conversación ${i + 1}</strong><br>
+            <small>${this.formatFullTime(conv.startedAt)}</small><br>
+            <span class="info-label">${conv.messageCount} mensajes • ${this.formatStatus(conv.status)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   /**
