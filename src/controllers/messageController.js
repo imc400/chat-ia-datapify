@@ -2,6 +2,7 @@ const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/openaiService');
 const conversationService = require('../services/conversationService');
 const calendarService = require('../services/calendarService');
+const memoryService = require('../services/memoryService');
 const config = require('../config');
 const logger = require('../utils/logger');
 
@@ -105,13 +106,17 @@ class MessageController {
       // 1. Usuario confirmó Y bot había preguntado por agendar
       // 2. O bot explícitamente dijo "te paso el link"
       if ((agentAskedToSchedule && userConfirms) || agentConfirmedLink) {
+        // Construir memoria conversacional para personalizar mensaje
+        const memory = memoryService.buildConversationalMemory(history);
+
         logger.info('📅 Enviando link de agendamiento', {
           userConfirmed: userConfirms,
           agentAsked: agentAskedToSchedule,
           agentConfirmedLink: agentConfirmedLink,
+          painPoints: memory.painPoints,
         });
 
-        await this.sendBookingLink(from);
+        await this.sendBookingLink(from, memory);
 
         // Marcar conversación como potencial agendamiento
         await conversationService.completeConversation(
@@ -211,8 +216,9 @@ class MessageController {
 
   /**
    * Envía el link de agendamiento de Google Calendar
+   * PERSONALIZADO con el dolor detectado del cliente
    */
-  async sendBookingLink(phone) {
+  async sendBookingLink(phone, memory = null) {
     try {
       const bookingLink = config.googleCalendar.bookingLink;
 
@@ -221,11 +227,46 @@ class MessageController {
         return;
       }
 
-      const message = `📅 Perfecto! Acá puedes elegir el día y hora que más te acomode:\n\n${bookingLink}\n\n¿Alguna pregunta antes de agendar?`;
+      // Generar mensaje personalizado según dolor detectado
+      let message = '📅 ';
+
+      if (memory && memory.painPoints && memory.painPoints.length > 0) {
+        // Mapear pain points a mensajes más naturales
+        const painPointsMap = {
+          'no vendo': 'aumentar tus ventas',
+          'ventas bajas': 'mejorar tus resultados',
+          'no funciona': 'optimizar tu estrategia',
+          'frustrado': 'resolver tus problemas de publicidad',
+          'gasto mucho': 'reducir tu inversión y mejorar ROI',
+          'pierdo plata': 'mejorar tu rentabilidad',
+          'ads no funcionan': 'optimizar tus anuncios',
+          'no compran': 'aumentar conversiones',
+          'sin resultados': 'conseguir mejores resultados',
+          'mal': 'mejorar tu situación',
+        };
+
+        // Encontrar el primer pain point que tengamos mapeado
+        let painSolution = 'optimizar tu publicidad de Shopify';
+        for (const pain of memory.painPoints) {
+          if (painPointsMap[pain]) {
+            painSolution = painPointsMap[pain];
+            break;
+          }
+        }
+
+        message += `Agenda aquí y vemos cómo te podemos ayudar con ${painSolution}:\n\n${bookingLink}`;
+      } else {
+        // Mensaje genérico si no hay dolor detectado
+        message += `Perfecto! Acá puedes elegir el día y hora que más te acomode:\n\n${bookingLink}`;
+      }
 
       await whatsappService.sendTextMessage(phone, message);
 
-      logger.info('✅ Link de agendamiento enviado', { phone });
+      logger.info('✅ Link de agendamiento enviado (personalizado)', {
+        phone,
+        hasPainPoints: memory?.painPoints?.length > 0,
+        painPoints: memory?.painPoints || [],
+      });
 
     } catch (error) {
       logger.error('Error enviando link de agendamiento:', error.message || error);
