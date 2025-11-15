@@ -73,28 +73,40 @@
           <div class="stat-card">
             <div class="stat-icon">💬</div>
             <div class="stat-details">
-              <div class="stat-label">Total Conversaciones</div>
+              <div class="stat-label">
+                Total Conversaciones
+                <span class="info-icon" data-tooltip="Contador total de teléfonos únicos que han iniciado conversación.<br><br><strong>Fórmula:</strong> COUNT(DISTINCT phone)">ⓘ</span>
+              </div>
               <div class="stat-value" id="stat-total">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon">🔥</div>
             <div class="stat-details">
-              <div class="stat-label">Hot Leads</div>
+              <div class="stat-label">
+                Hot Leads
+                <span class="info-icon" data-tooltip="Leads con alta probabilidad de conversión (leadScore ≥ 8/10).<br><br><strong>Fórmula:</strong> COUNT(leads WHERE leadScore ≥ 8)<br><br><em>El score se calcula automáticamente basado en: interés mostrado, preguntas realizadas, tiempo de respuesta, y señales de compra.</em>">ⓘ</span>
+              </div>
               <div class="stat-value" id="stat-hot">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon">📅</div>
             <div class="stat-details">
-              <div class="stat-label">Reuniones Agendadas</div>
+              <div class="stat-label">
+                Reuniones Agendadas
+                <span class="info-icon" data-tooltip="Total de leads que agendaron reunión verificada en Google Calendar.<br><br><strong>Fórmula:</strong> COUNT(leads WHERE scheduledMeeting = true)<br><br><em>Se sincroniza automáticamente con Google Calendar.</em>">ⓘ</span>
+              </div>
               <div class="stat-value" id="stat-scheduled">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon">📊</div>
             <div class="stat-details">
-              <div class="stat-label">Tasa de Conversión</div>
+              <div class="stat-label">
+                Tasa de Conversión
+                <span class="info-icon" data-tooltip="Porcentaje de conversaciones que terminan en agendamiento.<br><br><strong>Fórmula:</strong> (Reuniones Agendadas / Total Conversaciones) × 100<br><br><em>Ejemplo: 5 agendadas de 20 chats = 25%</em>">ⓘ</span>
+              </div>
               <div class="stat-value" id="stat-conversion">0%</div>
             </div>
           </div>
@@ -143,28 +155,40 @@
           <div class="stat-card">
             <div class="stat-icon">💬</div>
             <div class="stat-details">
-              <div class="stat-label">Total Chats</div>
+              <div class="stat-label">
+                Total Chats
+                <span class="info-icon" data-tooltip="Leads únicos que iniciaron conversación desde el inicio.<br><br><strong>Fórmula:</strong> COUNT(DISTINCT phone)">ⓘ</span>
+              </div>
               <div class="stat-value" id="funnel-total-chats">-</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon">📅</div>
             <div class="stat-details">
-              <div class="stat-label">Agendaron</div>
+              <div class="stat-label">
+                Agendaron
+                <span class="info-icon" data-tooltip="Leads que agendaron reunión verificada.<br><br><strong>Fórmula:</strong> COUNT(leads WHERE scheduledMeeting = true)">ⓘ</span>
+              </div>
               <div class="stat-value" id="funnel-scheduled">-</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon">🔄</div>
             <div class="stat-details">
-              <div class="stat-label">En Trial</div>
+              <div class="stat-label">
+                En Trial
+                <span class="info-icon" data-tooltip="Leads actualmente en periodo de prueba de 14 días.<br><br><strong>Fórmula:</strong> COUNT(leads WHERE conversionStatus = 'trial_14_days')">ⓘ</span>
+              </div>
               <div class="stat-value" id="funnel-trial">-</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon">💰</div>
             <div class="stat-details">
-              <div class="stat-label">Clientes Pagando</div>
+              <div class="stat-label">
+                Clientes Pagando
+                <span class="info-icon" data-tooltip="Total de clientes que están pagando actualmente.<br><br><strong>Fórmula:</strong> COUNT(leads WHERE conversionStatus IN ('paid_monthly_bonus', 'paid_after_trial'))<br><br><em>Incluye pagos directos y post-trial.</em>">ⓘ</span>
+              </div>
               <div class="stat-value" id="funnel-paying">-</div>
             </div>
           </div>
