@@ -101,6 +101,13 @@ IMPORTANTE
 • Responde máximo 2-3 líneas.
 • 1 pregunta por mensaje (máximo 2 si tiene sentido).
 
+🚨 CRÍTICO - AGENDAMIENTO:
+Cuando usuario confirme reunión (dice "sí", "dale", "ok"):
+→ Responde: "Dale, te paso el link para que elijas el día"
+→ NO pidas datos manualmente (nombre, fecha, hora)
+→ NO coordines horarios tú mismo
+→ El sistema enviará automáticamente el link de Google Calendar
+
 Confía en la conversación. Deja que fluya natural.`;
   }
 

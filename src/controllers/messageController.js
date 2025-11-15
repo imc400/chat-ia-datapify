@@ -78,23 +78,39 @@ class MessageController {
       // 7. ENVIAR RESPUESTA AL USUARIO
       await whatsappService.sendTextMessage(from, aiResponse);
 
-      // 8. LÓGICA DE AGENDAMIENTO
-      const agentAskedToSchedule = aiResponse.toLowerCase().includes('agend') ||
-                                   aiResponse.toLowerCase().includes('reuni') ||
-                                   aiResponse.toLowerCase().includes('llam') ||
-                                   aiResponse.toLowerCase().includes('link para agendar') ||
-                                   aiResponse.toLowerCase().includes('te paso el link') ||
-                                   aiResponse.toLowerCase().includes('enviar') && aiResponse.toLowerCase().includes('link');
-
+      // 8. LÓGICA DE AGENDAMIENTO MEJORADA
       const userConfirms = this.userConfirmsScheduling(userMessage);
 
-      // NUEVO: También enviar si la IA dice que va a pasar el link
+      // Verificar si el agente mencionó agendar/reunión en mensajes recientes
+      const recentAssistantMessages = history
+        .filter(h => h.role === 'assistant' || h.role === 'asistente')
+        .slice(-3); // Últimos 3 mensajes del bot
+
+      const agentAskedToSchedule = recentAssistantMessages.some(msg => {
+        const text = msg.content.toLowerCase();
+        return text.includes('agend') ||
+               text.includes('reuni') ||
+               text.includes('demo') ||
+               text.includes('llama') ||
+               text.includes('te tinca');
+      });
+
+      // Frases que indican que el bot va a pasar el link
       const agentConfirmedLink = aiResponse.toLowerCase().includes('te paso el link') ||
                                  aiResponse.toLowerCase().includes('te envío el link') ||
-                                 aiResponse.toLowerCase().includes('te enviaré el link') ||
-                                 (aiResponse.toLowerCase().includes('perfecto') && aiResponse.toLowerCase().includes('link'));
+                                 aiResponse.toLowerCase().includes('te mando el link') ||
+                                 aiResponse.toLowerCase().includes('te enviaré el link');
 
+      // ENVIAR LINK SI:
+      // 1. Usuario confirmó Y bot había preguntado por agendar
+      // 2. O bot explícitamente dijo "te paso el link"
       if ((agentAskedToSchedule && userConfirms) || agentConfirmedLink) {
+        logger.info('📅 Enviando link de agendamiento', {
+          userConfirmed: userConfirms,
+          agentAsked: agentAskedToSchedule,
+          agentConfirmedLink: agentConfirmedLink,
+        });
+
         await this.sendBookingLink(from);
 
         // Marcar conversación como potencial agendamiento
