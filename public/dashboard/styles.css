@@ -554,10 +554,51 @@ body {
 
 .conversation-info-panel {
   border-top: 1px solid var(--border-color);
-  padding: 20px;
   background: var(--bg-secondary);
+}
+
+.info-panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.info-panel-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+.info-panel-toggle-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-panel-toggle-icon {
+  font-size: 18px;
+  transition: transform 0.2s;
+}
+
+.info-panel-toggle.active .info-panel-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.info-panel-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.info-panel-content.active {
+  max-height: 600px;
   overflow-y: auto;
-  max-height: 300px;
+  padding: 0 20px 20px 20px;
 }
 
 .info-section {

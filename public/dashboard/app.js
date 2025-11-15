@@ -293,7 +293,14 @@ class DashboardApp {
     const summary = data.summary;
 
     container.innerHTML = `
-      <div class="info-section">
+      <div class="info-panel-toggle" id="info-toggle">
+        <div class="info-panel-toggle-text">
+          📋 Información del Lead
+        </div>
+        <div class="info-panel-toggle-icon">▼</div>
+      </div>
+      <div class="info-panel-content" id="info-content">
+        <div class="info-section">
         <h4>Información del Lead</h4>
         <div class="info-item">
           <span class="info-label">Nombre:</span>
@@ -345,17 +352,27 @@ class DashboardApp {
         </div>
       </div>
 
-      <div class="info-section">
-        <h4>Conversaciones individuales</h4>
-        ${data.conversations.map((conv, i) => `
-          <div class="conversation-timeline-item">
-            <strong>Conversación ${i + 1}</strong><br>
-            <small>${this.formatFullTime(conv.startedAt)}</small><br>
-            <span class="info-label">${conv.messageCount} mensajes • ${this.formatStatus(conv.status)}</span>
-          </div>
-        `).join('')}
+        <div class="info-section">
+          <h4>Conversaciones individuales</h4>
+          ${data.conversations.map((conv, i) => `
+            <div class="conversation-timeline-item">
+              <strong>Conversación ${i + 1}</strong><br>
+              <small>${this.formatFullTime(conv.startedAt)}</small><br>
+              <span class="info-label">${conv.messageCount} mensajes • ${this.formatStatus(conv.status)}</span>
+            </div>
+          `).join('')}
+        </div>
       </div>
     `;
+
+    // Agregar event listener para toggle
+    const toggle = document.getElementById('info-toggle');
+    const content = document.getElementById('info-content');
+
+    toggle.addEventListener('click', () => {
+      toggle.classList.toggle('active');
+      content.classList.toggle('active');
+    });
   }
 
   /**
@@ -410,7 +427,14 @@ class DashboardApp {
     const analytics = conversation.analytics || {};
 
     container.innerHTML = `
-      <div class="info-section">
+      <div class="info-panel-toggle" id="info-toggle">
+        <div class="info-panel-toggle-text">
+          📋 Información del Lead
+        </div>
+        <div class="info-panel-toggle-icon">▼</div>
+      </div>
+      <div class="info-panel-content" id="info-content">
+        <div class="info-section">
         <h4>Información del Lead</h4>
         <div class="info-item">
           <span class="info-label">Nombre:</span>
@@ -450,18 +474,28 @@ class DashboardApp {
         </div>
       </div>
 
-      <div class="info-section">
-        <h4>Timeline</h4>
-        <div class="info-item">
-          <span class="info-label">Iniciado:</span>
-          <span class="info-value">${this.formatFullTime(conversation.startedAt)}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Última actividad:</span>
-          <span class="info-value">${this.formatFullTime(conversation.updatedAt)}</span>
+        <div class="info-section">
+          <h4>Timeline</h4>
+          <div class="info-item">
+            <span class="info-label">Iniciado:</span>
+            <span class="info-value">${this.formatFullTime(conversation.startedAt)}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Última actividad:</span>
+            <span class="info-value">${this.formatFullTime(conversation.updatedAt)}</span>
+          </div>
         </div>
       </div>
     `;
+
+    // Agregar event listener para toggle
+    const toggle = document.getElementById('info-toggle');
+    const content = document.getElementById('info-content');
+
+    toggle.addEventListener('click', () => {
+      toggle.classList.toggle('active');
+      content.classList.toggle('active');
+    });
   }
 
   /**
