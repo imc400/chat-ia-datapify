@@ -19,13 +19,25 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // Rate limiting para proteger el webhook
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // límite de 100 requests por ventana
+// Configuración escalable para Meta Ads
+const webhookLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 60, // 60 requests/min = 1 por segundo sostenido
   message: 'Demasiadas solicitudes desde esta IP, intenta más tarde',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 
-app.use('/webhook', limiter);
+// Rate limit más permisivo para el dashboard
+const dashboardLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 120, // Dashboard puede hacer más requests
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/webhook', webhookLimiter);
+app.use('/api/dashboard', dashboardLimiter);
 
 // Parseo de JSON
 app.use(express.json());

@@ -10,6 +10,7 @@ const prisma = new PrismaClient();
 class ConversationService {
   /**
    * Crea o recupera una conversación existente
+   * NUEVO: Reabre conversaciones completadas si el usuario vuelve en < 4 horas
    */
   async getOrCreateConversation(phone) {
     try {
@@ -29,7 +30,60 @@ class ConversationService {
         },
       });
 
-      // Si no existe, crear nueva
+      // Si no hay conversación activa, buscar si hay una reciente completada
+      if (!conversation) {
+        const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+
+        const recentCompleted = await prisma.conversation.findFirst({
+          where: {
+            phone,
+            status: 'completed',
+            updatedAt: {
+              gte: fourHoursAgo, // Completada hace menos de 4 horas
+            },
+          },
+          include: {
+            messages: {
+              orderBy: { timestamp: 'desc' },
+              take: 8,
+            },
+            leadData: true,
+            analytics: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+        });
+
+        // Si hay conversación reciente, REABRIRLA
+        if (recentCompleted) {
+          conversation = await prisma.conversation.update({
+            where: { id: recentCompleted.id },
+            data: {
+              status: 'active',
+              endedAt: null, // Limpiar fecha de finalización
+            },
+            include: {
+              messages: {
+                orderBy: { timestamp: 'desc' },
+                take: 8,
+              },
+              leadData: true,
+              analytics: true,
+            },
+          });
+
+          logger.info('🔄 Conversación reabierta', {
+            phone,
+            conversationId: conversation.id,
+            previouslyEndedAt: recentCompleted.endedAt,
+          });
+
+          return conversation;
+        }
+      }
+
+      // Si no existe ninguna (ni activa ni reciente), crear nueva
       if (!conversation) {
         conversation = await prisma.conversation.create({
           data: {

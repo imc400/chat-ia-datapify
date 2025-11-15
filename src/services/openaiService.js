@@ -17,6 +17,8 @@ class OpenAIService {
   constructor() {
     this.openai = new OpenAI({
       apiKey: config.openai.apiKey,
+      timeout: 30000, // 30 segundos timeout para prevenir bloqueos
+      maxRetries: 2, // Reintentar hasta 2 veces si falla
     });
 
     // Cargar conocimiento del negocio
