@@ -5,6 +5,7 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const behaviourController = require('./behaviourController');
 const orchestrationService = require('./orchestrationService');
+const memoryService = require('./memoryService');
 
 /**
  * ARQUITECTURA DE 3 CAPAS
@@ -110,17 +111,27 @@ Confía en la conversación. Deja que fluya natural.`;
   async generateResponse(userMessage, conversationHistory = [], leadScore = null) {
     try {
       // ============================================
-      // CAPA 3: BEHAVIOUR CONTROLLER
-      // Analizar estado de la conversación
+      // CAPA 3: BEHAVIOUR CONTROLLER + MEMORIA
+      // Analizar estado de la conversación y construir memoria
       // ============================================
       const conversationState = behaviourController.analyzeConversationState(conversationHistory);
+
+      // NUEVO: Construir memoria conversacional inteligente
+      const memory = memoryService.buildConversationalMemory(conversationHistory);
+      const conversionScore = memoryService.calculateConversionScore(memory);
+      const enrichedContext = memoryService.generateEnrichedContext(memory, conversationState);
+
+      // Instrucciones dinámicas simples (backup si falla memoria)
       const dynamicInstructions = behaviourController.generateDynamicInstructions(conversationState);
 
       logger.info('🧠 Estado de conversación analizado', {
         phase: conversationState.phase,
         hasName: conversationState.hasName,
         platform: conversationState.platform,
-        shouldDescalify: conversationState.shouldDescalify,
+        memoryName: memory.name,
+        painPoints: memory.painPoints.length,
+        frustrationLevel: memory.frustrationLevel,
+        conversionScore: conversionScore,
         readyToPropose: conversationState.readyToPropose,
       });
 
@@ -156,20 +167,18 @@ Confía en la conversación. Deja que fluya natural.`;
         },
       ];
 
-      // Agregar instrucciones dinámicas de Behaviour Controller
+      // Agregar MEMORIA CONVERSACIONAL ENRIQUECIDA (prioridad alta)
       messages.push({
         role: 'system',
-        content: `🎯 INSTRUCCIONES PARA ESTE MENSAJE (OBLIGATORIO SEGUIR):
+        content: `${enrichedContext}
 
-${context.dynamicInstructions}${context.sentimentInstructions}
-
-⚠️ REGLAS ESTRICTAS (NO NEGOCIABLES):
+⚠️ REGLAS BÁSICAS:
 - ${context.rules.maxLength}
 - ${context.rules.maxQuestions}
 - ${context.rules.maxLines}
 - Estilo: ${context.rules.style}
 
-IMPORTANTE: Estas instrucciones son ESPECÍFICAS para este momento de la conversación. Ignora cualquier flujo general y SIGUE estas instrucciones AHORA.`,
+${context.sentimentInstructions}`,
       });
 
       // Agregar historial limpio (solo últimos 6 mensajes)
