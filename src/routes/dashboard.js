@@ -20,4 +20,14 @@ router.patch('/conversations/:id/tag', dashboardController.tagConversation);
 // GET /api/dashboard/stats - Estadísticas generales
 router.get('/stats', dashboardController.getStats);
 
+// GET /api/dashboard/conversion-stats - Estadísticas de conversión
+router.get('/conversion-stats', dashboardController.getConversionStats);
+
+// NUEVO: Gestión de Leads
+// GET /api/dashboard/leads - Obtener todos los leads con filtros
+router.get('/leads', dashboardController.getLeads);
+
+// PATCH /api/dashboard/leads/:phone/conversion - Actualizar estado de conversión de un lead
+router.patch('/leads/:phone/conversion', dashboardController.updateLeadConversionStatus);
+
 module.exports = router;

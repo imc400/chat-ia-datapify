@@ -47,6 +47,11 @@ class DashboardApp {
         // Mostrar página correspondiente
         pages.forEach(page => page.classList.remove('active'));
         document.getElementById(`page-${targetPage}`).classList.add('active');
+
+        // Cargar datos según la página
+        if (targetPage === 'leads') {
+          this.loadLeadsPage();
+        }
       });
     });
   }
@@ -647,6 +652,251 @@ class DashboardApp {
     // Puedes implementar un toast o notificación
     console.error(message);
     alert(message);
+  }
+
+  /**
+   * ==============================================
+   * PÁGINA DE LEADS - NUEVAS FUNCIONALIDADES
+   * ==============================================
+   */
+
+  async loadLeadsPage() {
+    try {
+      const [leadsResponse, statsResponse] = await Promise.all([
+        fetch('/api/dashboard/leads?limit=100'),
+        fetch('/api/dashboard/conversion-stats'),
+      ]);
+
+      const { data: leads } = await leadsResponse.json();
+      const { data: stats } = await statsResponse.json();
+
+      this.renderLeadsStats(stats);
+      this.renderLeadsTable(leads);
+      this.setupLeadsFilters();
+
+    } catch (error) {
+      console.error('Error cargando página de leads:', error);
+      this.showError('Error cargando leads');
+    }
+  }
+
+  renderLeadsStats(stats) {
+    const container = document.getElementById('leads-stats');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-details">
+          <div class="stat-label">Total Leads</div>
+          <div class="stat-value">${stats.totalLeads}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-details">
+          <div class="stat-label">Con Shopify</div>
+          <div class="stat-value">${stats.metrics.withShopify}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-details">
+          <div class="stat-label">Agendados</div>
+          <div class="stat-value">${stats.metrics.scheduled}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-details">
+          <div class="stat-label">Pagaron</div>
+          <div class="stat-value">${stats.metrics.totalPaid}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-details">
+          <div class="stat-label">Tasa de Conversión</div>
+          <div class="stat-value">${stats.metrics.conversionRate}%</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔄</div>
+        <div class="stat-details">
+          <div class="stat-label">Trial 14 días</div>
+          <div class="stat-value">${stats.byStatus.trial_14_days}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  renderLeadsTable(leads) {
+    const container = document.getElementById('leads-table');
+    if (!container) return;
+
+    if (leads.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay leads para mostrar</div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="leads-table">
+        <thead>
+          <tr>
+            <th>Teléfono</th>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Sitio Web</th>
+            <th>Shopify</th>
+            <th>Estado</th>
+            <th>Agendado</th>
+            <th>Score</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${leads.map(lead => `
+            <tr data-phone="${lead.phone}">
+              <td>${lead.phone}</td>
+              <td>${lead.name || '-'} ${lead.lastName || ''}</td>
+              <td>${lead.email || '-'}</td>
+              <td>${lead.website ? `<a href="${lead.website}" target="_blank">${lead.website}</a>` : '-'}</td>
+              <td>${lead.hasShopify ? '✅' : '❌'}</td>
+              <td>
+                ${this.renderConversionStatusBadge(lead.conversionStatus)}
+              </td>
+              <td>${lead.scheduledMeeting ? `✅ (${lead.calendarEventCount})` : '❌'}</td>
+              <td>${lead.leadScore}/10</td>
+              <td>
+                <button class="btn-change-status" data-phone="${lead.phone}" data-status="${lead.conversionStatus || 'none'}">
+                  Cambiar Estado
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Agregar event listeners para cambiar estado
+    container.querySelectorAll('.btn-change-status').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const phone = e.target.dataset.phone;
+        const currentStatus = e.target.dataset.status;
+        this.showConversionStatusModal(phone, currentStatus);
+      });
+    });
+  }
+
+  renderConversionStatusBadge(status) {
+    const badges = {
+      trial_14_days: '<span class="status-badge trial">🔄 Trial 14d</span>',
+      paid_monthly_bonus: '<span class="status-badge paid">💰 Mensual + Bonos</span>',
+      paid_after_trial: '<span class="status-badge paid">💰 Pagó post-trial</span>',
+      none: '<span class="status-badge none">Sin conversión</span>',
+    };
+    return badges[status] || badges.none;
+  }
+
+  showConversionStatusModal(phone, currentStatus) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Cambiar Estado de Conversión</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Teléfono:</strong> ${phone}</p>
+          <p><strong>Estado actual:</strong> ${this.renderConversionStatusBadge(currentStatus)}</p>
+
+          <label for="conversion-status">Nuevo estado:</label>
+          <select id="conversion-status" class="form-select">
+            <option value="none" ${currentStatus === 'none' ? 'selected' : ''}>Sin conversión</option>
+            <option value="trial_14_days" ${currentStatus === 'trial_14_days' ? 'selected' : ''}>🔄 Empezó 14 días gratis</option>
+            <option value="paid_monthly_bonus" ${currentStatus === 'paid_monthly_bonus' ? 'selected' : ''}>💰 Pagó mensual con bonos</option>
+            <option value="paid_after_trial" ${currentStatus === 'paid_after_trial' ? 'selected' : ''}>💰 Contrató después de trial</option>
+          </select>
+
+          <label for="conversion-notes">Notas (opcional):</label>
+          <textarea id="conversion-notes" class="form-textarea" rows="3" placeholder="Agregar notas sobre la conversión..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary modal-cancel">Cancelar</button>
+          <button class="btn-primary modal-save" data-phone="${phone}">Guardar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+    modal.querySelector('.modal-cancel').addEventListener('click', () => modal.remove());
+    modal.querySelector('.modal-save').addEventListener('click', async (e) => {
+      const newStatus = modal.querySelector('#conversion-status').value;
+      const notes = modal.querySelector('#conversion-notes').value;
+      await this.updateConversionStatus(phone, newStatus, notes);
+      modal.remove();
+    });
+
+    // Cerrar al hacer click fuera del modal
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+  }
+
+  async updateConversionStatus(phone, conversionStatus, conversionNotes) {
+    try {
+      const response = await fetch(`/api/dashboard/leads/${encodeURIComponent(phone)}/conversion`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversionStatus, conversionNotes }),
+      });
+
+      const { success, data } = await response.json();
+
+      if (success) {
+        alert('✅ Estado actualizado correctamente');
+        this.loadLeadsPage(); // Recargar la tabla
+      } else {
+        throw new Error('Error actualizando estado');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error actualizando estado');
+    }
+  }
+
+  setupLeadsFilters() {
+    const filterStatus = document.getElementById('filter-lead-status');
+    const filterShopify = document.getElementById('filter-lead-shopify');
+
+    if (filterStatus) {
+      filterStatus.addEventListener('change', () => this.filterLeads());
+    }
+
+    if (filterShopify) {
+      filterShopify.addEventListener('change', () => this.filterLeads());
+    }
+  }
+
+  async filterLeads() {
+    const status = document.getElementById('filter-lead-status').value;
+    const shopify = document.getElementById('filter-lead-shopify').value;
+
+    let url = '/api/dashboard/leads?limit=100';
+    if (status && status !== 'all') url += `&status=${status}`;
+    if (shopify === 'true') url += `&hasShopify=true`;
+
+    try {
+      const response = await fetch(url);
+      const { data: leads } = await response.json();
+      this.renderLeadsTable(leads);
+    } catch (error) {
+      console.error('Error filtrando leads:', error);
+    }
   }
 }
 

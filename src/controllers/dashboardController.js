@@ -203,6 +203,40 @@ class DashboardController {
         if (calendarCheck.hasScheduled) {
           calendarFormData = calendarCheck.leadData;
           calendarEventCount = calendarCheck.eventCount;
+
+          // SINCRONIZACIÓN AUTOMÁTICA: Actualizar CRM con datos del calendario
+          if (latestLeadData && calendarFormData) {
+            const needsUpdate =
+              !latestLeadData.email ||
+              !latestLeadData.website ||
+              !latestLeadData.lastName ||
+              !latestLeadData.calendarSyncedAt;
+
+            if (needsUpdate) {
+              logger.info('🔄 Sincronizando datos del calendario al CRM', { phone });
+
+              await prisma.leadData.update({
+                where: { id: latestLeadData.id },
+                data: {
+                  email: calendarFormData.email || latestLeadData.email,
+                  website: calendarFormData.sitioWeb || latestLeadData.website,
+                  lastName: calendarFormData.apellido || latestLeadData.lastName,
+                  name: calendarFormData.nombre || latestLeadData.name,
+                  calendarSyncedAt: new Date(),
+                },
+              });
+
+              logger.info('✅ Datos sincronizados desde calendario', {
+                phone,
+                syncedFields: {
+                  email: !!calendarFormData.email,
+                  website: !!calendarFormData.sitioWeb,
+                  lastName: !!calendarFormData.apellido,
+                  name: !!calendarFormData.nombre,
+                },
+              });
+            }
+          }
         }
       } catch (error) {
         logger.warn('Error verificando calendario para', phone, error.message);
@@ -411,6 +445,232 @@ class DashboardController {
 
     } catch (error) {
       logger.error('Error obteniendo estadísticas:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error obteniendo estadísticas',
+      });
+    }
+  }
+
+  /**
+   * NUEVO: Obtener todos los leads (agrupados por teléfono) con filtros
+   * Para la página de LEADS
+   */
+  async getLeads(req, res) {
+    try {
+      const {
+        status,        // 'trial_14_days', 'paid_monthly_bonus', 'paid_after_trial', 'none'
+        hasShopify,
+        scheduled,
+        limit = 100,
+        offset = 0,
+        sortBy = 'updatedAt',
+        sortOrder = 'desc',
+      } = req.query;
+
+      // Construir filtros para leadData
+      const leadWhere = {};
+      if (status && status !== 'all') {
+        leadWhere.conversionStatus = status;
+      }
+      if (hasShopify === 'true') {
+        leadWhere.hasShopify = true;
+      }
+
+      // Obtener leads con sus conversaciones
+      const leads = await prisma.leadData.findMany({
+        where: leadWhere,
+        include: {
+          conversation: {
+            include: {
+              messages: {
+                orderBy: { timestamp: 'desc' },
+                take: 1,
+              },
+            },
+          },
+        },
+        orderBy: { [sortBy]: sortOrder },
+        skip: parseInt(offset),
+        take: parseInt(limit),
+      });
+
+      // Filtrar por scheduled si se especifica
+      let filteredLeads = leads;
+      if (scheduled === 'true') {
+        filteredLeads = leads.filter(lead => lead.conversation.scheduledMeeting);
+      }
+
+      // Enriquecer con datos del calendario
+      const enrichedLeads = await Promise.all(filteredLeads.map(async (lead) => {
+        let calendarData = null;
+        let calendarEventCount = 0;
+
+        try {
+          const calendarCheck = await calendarService.checkPhoneHasScheduledEvents(lead.conversation.phone);
+          if (calendarCheck.hasScheduled) {
+            calendarData = calendarCheck.leadData;
+            calendarEventCount = calendarCheck.eventCount;
+          }
+        } catch (error) {
+          logger.warn('Error verificando calendario', error);
+        }
+
+        return {
+          id: lead.id,
+          phone: lead.conversation.phone,
+          name: lead.name,
+          lastName: lead.lastName,
+          email: lead.email,
+          website: lead.website,
+          businessType: lead.businessType,
+          hasShopify: lead.hasShopify,
+          monthlyRevenueCLP: lead.monthlyRevenueCLP,
+          investsInAds: lead.investsInAds,
+          conversionStatus: lead.conversionStatus,
+          conversionDate: lead.conversionDate,
+          conversionNotes: lead.conversionNotes,
+          calendarSyncedAt: lead.calendarSyncedAt,
+          scheduledMeeting: lead.conversation.scheduledMeeting,
+          calendarEventCount,
+          leadTemperature: lead.conversation.leadTemperature,
+          leadScore: lead.conversation.leadScore,
+          lastMessage: lead.conversation.messages[0],
+          updatedAt: lead.updatedAt,
+          createdAt: lead.extractedAt,
+        };
+      }));
+
+      const total = await prisma.leadData.count({ where: leadWhere });
+
+      res.json({
+        success: true,
+        data: enrichedLeads,
+        pagination: {
+          total,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: offset + limit < total,
+        },
+      });
+
+    } catch (error) {
+      logger.error('Error obteniendo leads:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error obteniendo leads',
+      });
+    }
+  }
+
+  /**
+   * NUEVO: Actualizar estado de conversión de un lead
+   */
+  async updateLeadConversionStatus(req, res) {
+    try {
+      const { phone } = req.params;
+      const { conversionStatus, conversionNotes } = req.body;
+
+      // Validar estado
+      const validStatuses = ['trial_14_days', 'paid_monthly_bonus', 'paid_after_trial', 'none'];
+      if (!validStatuses.includes(conversionStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: `Estado inválido. Debe ser uno de: ${validStatuses.join(', ')}`,
+        });
+      }
+
+      // Encontrar la conversación más reciente del teléfono
+      const conversation = await prisma.conversation.findFirst({
+        where: { phone },
+        orderBy: { updatedAt: 'desc' },
+        include: { leadData: true },
+      });
+
+      if (!conversation || !conversation.leadData) {
+        return res.status(404).json({
+          success: false,
+          error: 'No se encontró lead para este teléfono',
+        });
+      }
+
+      // Actualizar leadData
+      const updatedLead = await prisma.leadData.update({
+        where: { id: conversation.leadData.id },
+        data: {
+          conversionStatus,
+          conversionDate: conversionStatus !== 'none' ? new Date() : null,
+          conversionNotes,
+        },
+      });
+
+      logger.info('✅ Estado de conversión actualizado', {
+        phone,
+        conversionStatus,
+        leadId: updatedLead.id,
+      });
+
+      res.json({
+        success: true,
+        data: updatedLead,
+      });
+
+    } catch (error) {
+      logger.error('Error actualizando estado de conversión:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error actualizando estado de conversión',
+      });
+    }
+  }
+
+  /**
+   * NUEVO: Obtener estadísticas de conversión
+   */
+  async getConversionStats(req, res) {
+    try {
+      const [
+        totalLeads,
+        trial14Days,
+        paidMonthlyBonus,
+        paidAfterTrial,
+        withShopify,
+        scheduled,
+      ] = await Promise.all([
+        prisma.leadData.count(),
+        prisma.leadData.count({ where: { conversionStatus: 'trial_14_days' } }),
+        prisma.leadData.count({ where: { conversionStatus: 'paid_monthly_bonus' } }),
+        prisma.leadData.count({ where: { conversionStatus: 'paid_after_trial' } }),
+        prisma.leadData.count({ where: { hasShopify: true } }),
+        prisma.conversation.count({ where: { scheduledMeeting: true } }),
+      ]);
+
+      const totalPaid = paidMonthlyBonus + paidAfterTrial;
+      const conversionRate = totalLeads > 0 ? ((totalPaid / totalLeads) * 100).toFixed(1) : 0;
+      const shopifyConversionRate = withShopify > 0 ? ((scheduled / withShopify) * 100).toFixed(1) : 0;
+
+      res.json({
+        success: true,
+        data: {
+          totalLeads,
+          byStatus: {
+            trial_14_days: trial14Days,
+            paid_monthly_bonus: paidMonthlyBonus,
+            paid_after_trial: paidAfterTrial,
+            none: totalLeads - trial14Days - paidMonthlyBonus - paidAfterTrial,
+          },
+          metrics: {
+            withShopify,
+            scheduled,
+            totalPaid,
+            conversionRate: parseFloat(conversionRate),
+            shopifyToScheduledRate: parseFloat(shopifyConversionRate),
+          },
+        },
+      });
+
+    } catch (error) {
+      logger.error('Error obteniendo estadísticas de conversión:', error);
       res.status(500).json({
         success: false,
         error: 'Error obteniendo estadísticas',

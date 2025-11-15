@@ -139,11 +139,38 @@
         </div>
       </div>
 
-      <!-- Page: Leads (placeholder) -->
+      <!-- Page: Leads -->
       <div id="page-leads" class="page">
         <div class="page-header">
-          <h2 class="page-title">Gestión de Leads</h2>
-          <p class="page-subtitle">Próximamente...</p>
+          <div>
+            <h2 class="page-title">Gestión de Leads</h2>
+            <p class="page-subtitle">Administra y clasifica tus leads con estados de conversión</p>
+          </div>
+          <div class="header-actions">
+            <select id="filter-lead-shopify" class="filter-select">
+              <option value="">Todos</option>
+              <option value="true">🛍️ Solo con Shopify</option>
+            </select>
+            <select id="filter-lead-status" class="filter-select">
+              <option value="all">Todos los estados</option>
+              <option value="none">Sin conversión</option>
+              <option value="trial_14_days">🔄 Trial 14 días</option>
+              <option value="paid_monthly_bonus">💰 Mensual + Bonos</option>
+              <option value="paid_after_trial">💰 Pagó post-trial</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="leads-stats">
+          <!-- Se carga dinámicamente -->
+        </div>
+
+        <!-- Tabla de Leads -->
+        <div class="leads-table-container">
+          <div id="leads-table">
+            <div class="loading">Cargando leads...</div>
+          </div>
         </div>
       </div>
 

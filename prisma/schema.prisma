@@ -70,6 +70,18 @@ model LeadData {
   location              String?
   painPoints            Json?    // Array de dolores identificados
   qualificationSignals  Json?    // Señales detectadas
+
+  // NUEVOS CAMPOS: Datos sincronizados desde Google Calendar
+  email                 String?  // Email del calendario
+  website               String?  // Sitio web del calendario
+  lastName              String?  // Apellido extraído del calendario
+  calendarSyncedAt      DateTime? // Última sincronización con calendario
+
+  // NUEVOS CAMPOS: Estado de conversión y pago
+  conversionStatus      String?  // 'trial_14_days', 'paid_monthly_bonus', 'paid_after_trial', 'none'
+  conversionDate        DateTime? // Fecha en que se convirtió
+  conversionNotes       String?  @db.Text // Notas adicionales sobre la conversión
+
   extractedAt           DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -79,6 +91,8 @@ model LeadData {
   @@index([conversationId])
   @@index([hasShopify])
   @@index([monthlyRevenueCLP])
+  @@index([conversionStatus])
+  @@index([email])
 }
 
 // ========================================
