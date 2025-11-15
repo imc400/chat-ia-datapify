@@ -231,15 +231,30 @@
           <div class="funnel-arrow">↓</div>
           <div class="funnel-conversion-rate" id="conversion-3-5">-</div>
 
-          <div class="funnel-stage" id="stage-5">
-            <div class="funnel-stage-header">
-              <span class="funnel-stage-number">4</span>
-              <span class="funnel-stage-title">Pagaron Post-Trial</span>
+          <!-- Split después del trial: Pago vs Churn -->
+          <div class="funnel-split">
+            <div class="funnel-stage funnel-stage-split funnel-stage-success" id="stage-5">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-number">✓</span>
+                <span class="funnel-stage-title">Pagaron Post-Trial</span>
+              </div>
+              <div class="funnel-stage-body">
+                <div class="funnel-stage-count" id="stage-5-count">-</div>
+                <div class="funnel-stage-percentage" id="stage-5-percentage">-</div>
+                <div class="funnel-stage-desc">Completaron trial y convirtieron</div>
+              </div>
             </div>
-            <div class="funnel-stage-body">
-              <div class="funnel-stage-count" id="stage-5-count">-</div>
-              <div class="funnel-stage-percentage" id="stage-5-percentage">-</div>
-              <div class="funnel-stage-desc">Completaron trial y convirtieron</div>
+
+            <div class="funnel-stage funnel-stage-split funnel-stage-churn" id="stage-6">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-number">✗</span>
+                <span class="funnel-stage-title">Trial Sin Conversión</span>
+              </div>
+              <div class="funnel-stage-body">
+                <div class="funnel-stage-count" id="stage-6-count">-</div>
+                <div class="funnel-stage-percentage" id="stage-6-percentage">-</div>
+                <div class="funnel-stage-desc">Terminaron trial pero NO pagaron (churn)</div>
+              </div>
             </div>
           </div>
         </div>
@@ -247,7 +262,7 @@
         <!-- Conversion Rates Summary -->
         <div class="conversion-summary">
           <h3 style="margin-bottom: 20px; color: #1a1a2e;">Tasas de Conversión</h3>
-          <div class="conversion-grid">
+          <div class="conversion-grid conversion-grid-5">
             <div class="conversion-card">
               <div class="conversion-label">Chat → Agendamiento</div>
               <div class="conversion-value" id="rate-chat-schedule">-</div>
@@ -260,8 +275,13 @@
             </div>
             <div class="conversion-card">
               <div class="conversion-label">Trial → Pago</div>
-              <div class="conversion-value" id="rate-trial-payment">-</div>
+              <div class="conversion-value success" id="rate-trial-payment">-</div>
               <div class="conversion-desc" id="desc-trial-payment">-</div>
+            </div>
+            <div class="conversion-card">
+              <div class="conversion-label">Trial → Churn</div>
+              <div class="conversion-value danger" id="rate-trial-churn">-</div>
+              <div class="conversion-desc" id="desc-trial-churn">-</div>
             </div>
             <div class="conversion-card">
               <div class="conversion-label">Conversión Total</div>
@@ -310,8 +330,9 @@
               <option value="all">Todos los estados</option>
               <option value="none">Sin conversión</option>
               <option value="trial_14_days">🔄 Trial 14 días</option>
+              <option value="trial_completed_no_payment">❌ Trial sin conversión</option>
               <option value="paid_monthly_bonus">💰 Mensual + Bonos</option>
-              <option value="paid_after_trial">💰 Pagó post-trial</option>
+              <option value="paid_after_trial">✅ Pagó post-trial</option>
             </select>
           </div>
         </div>

@@ -82,8 +82,14 @@ model LeadData {
   calendarSyncedAt      DateTime? // Última sincronización con calendario
 
   // NUEVOS CAMPOS: Estado de conversión y pago
-  conversionStatus      String?  // 'trial_14_days', 'paid_monthly_bonus', 'paid_after_trial', 'none'
-  conversionDate        DateTime? // Fecha en que se convirtió
+  // Estados posibles:
+  // - 'none': Sin conversión todavía
+  // - 'trial_14_days': Empezó trial de 14 días
+  // - 'trial_completed_no_payment': Terminó trial pero NO pagó (churn)
+  // - 'paid_monthly_bonus': Pagó directo $199/mes con bonos (sin trial)
+  // - 'paid_after_trial': Completó trial y pagó
+  conversionStatus      String?  // Estado de conversión
+  conversionDate        DateTime? // Fecha en que se convirtió o cambió de estado
   conversionNotes       String?  @db.Text // Notas adicionales sobre la conversión
 
   // FASE 2: Memoria persistente entre conversaciones

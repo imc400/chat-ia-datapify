@@ -292,32 +292,40 @@ router.get('/funnel', async (req, res) => {
     );
     const totalScheduled = leadsScheduled.length;
 
-    // 3. ETAPA 3: Empezaron trial de 14 días
+    // 3. ETAPA 3A: Empezaron trial de 14 días (actualmente en trial)
     const leadsTrial = allLeads.filter(lead =>
       lead.conversionStatus === 'trial_14_days'
     );
     const totalTrial = leadsTrial.length;
 
-    // 4. ETAPA 4: Pagaron plan mensual con bonos (directo, sin trial)
+    // 3B. ETAPA 3B: Pagaron plan mensual con bonos (directo, sin trial)
     const leadsPaidBonus = allLeads.filter(lead =>
       lead.conversionStatus === 'paid_monthly_bonus'
     );
     const totalPaidBonus = leadsPaidBonus.length;
 
-    // 5. ETAPA 5: Pagaron después del trial
+    // 4. ETAPA 4: Pagaron después del trial (conversión exitosa)
     const leadsPaidAfterTrial = allLeads.filter(lead =>
       lead.conversionStatus === 'paid_after_trial'
     );
     const totalPaidAfterTrial = leadsPaidAfterTrial.length;
 
+    // 5. ETAPA 5: Terminaron trial pero NO pagaron (churn)
+    const leadsTrialNoPayment = allLeads.filter(lead =>
+      lead.conversionStatus === 'trial_completed_no_payment'
+    );
+    const totalTrialNoPayment = leadsTrialNoPayment.length;
+
     // TOTALES
     const totalConverted = totalPaidBonus + totalPaidAfterTrial; // Total que pagó
     const totalStartedSomething = totalTrial + totalPaidBonus; // Total que empezó algo (trial O pago directo)
+    const totalTrialCompleted = totalPaidAfterTrial + totalTrialNoPayment; // Total que terminó trial (pagó o no)
 
     // TASAS DE CONVERSIÓN
     const chatToScheduleRate = totalLeads > 0 ? (totalScheduled / totalLeads * 100).toFixed(2) : 0;
     const scheduleToConversionRate = totalScheduled > 0 ? (totalStartedSomething / totalScheduled * 100).toFixed(2) : 0;
-    const trialToPaymentRate = totalTrial > 0 ? (totalPaidAfterTrial / totalTrial * 100).toFixed(2) : 0;
+    const trialToPaymentRate = totalTrialCompleted > 0 ? (totalPaidAfterTrial / totalTrialCompleted * 100).toFixed(2) : 0;
+    const trialChurnRate = totalTrialCompleted > 0 ? (totalTrialNoPayment / totalTrialCompleted * 100).toFixed(2) : 0;
     const overallConversionRate = totalLeads > 0 ? (totalConverted / totalLeads * 100).toFixed(2) : 0;
 
     // REVENUE (asumiendo $199 USD por cliente)
@@ -363,6 +371,13 @@ router.get('/funnel', async (req, res) => {
             description: 'Leads que completaron trial y pagaron',
             conversionFromTrial: `${trialToPaymentRate}%`,
           },
+          stage6_trial_churn: {
+            label: '6. Trial Sin Conversión (Churn)',
+            count: totalTrialNoPayment,
+            percentage: `${(totalLeads > 0 ? (totalTrialNoPayment / totalLeads * 100).toFixed(2) : 0)}%`,
+            description: 'Leads que terminaron trial pero NO pagaron',
+            churnRate: `${trialChurnRate}%`,
+          },
         },
         conversionRates: {
           chatToSchedule: {
@@ -378,7 +393,12 @@ router.get('/funnel', async (req, res) => {
           trialToPayment: {
             label: 'Trial → Pago',
             rate: `${trialToPaymentRate}%`,
-            description: `${totalPaidAfterTrial} de ${totalTrial} trials pagaron`,
+            description: `${totalPaidAfterTrial} de ${totalTrialCompleted} trials completados pagaron`,
+          },
+          trialChurn: {
+            label: 'Trial → Churn',
+            rate: `${trialChurnRate}%`,
+            description: `${totalTrialNoPayment} de ${totalTrialCompleted} trials completados NO pagaron`,
           },
           overallConversion: {
             label: 'Conversión Total (Chat → Pago)',
@@ -398,8 +418,10 @@ router.get('/funnel', async (req, res) => {
           totalTrial,
           totalPaidBonus,
           totalPaidAfterTrial,
+          totalTrialNoPayment,
           totalConverted,
           totalStartedSomething,
+          totalTrialCompleted,
         },
       },
     });

@@ -691,6 +691,9 @@ class DashboardApp {
       document.getElementById('stage-5-percentage').textContent = data.funnel.stage5_paid_after_trial.percentage;
       document.getElementById('conversion-3-5').textContent = data.funnel.stage5_paid_after_trial.conversionFromTrial;
 
+      document.getElementById('stage-6-count').textContent = data.funnel.stage6_trial_churn.count;
+      document.getElementById('stage-6-percentage').textContent = data.funnel.stage6_trial_churn.percentage;
+
       // Actualizar conversion rates
       document.getElementById('rate-chat-schedule').textContent = data.conversionRates.chatToSchedule.rate;
       document.getElementById('desc-chat-schedule').textContent = data.conversionRates.chatToSchedule.description;
@@ -700,6 +703,9 @@ class DashboardApp {
 
       document.getElementById('rate-trial-payment').textContent = data.conversionRates.trialToPayment.rate;
       document.getElementById('desc-trial-payment').textContent = data.conversionRates.trialToPayment.description;
+
+      document.getElementById('rate-trial-churn').textContent = data.conversionRates.trialChurn.rate;
+      document.getElementById('desc-trial-churn').textContent = data.conversionRates.trialChurn.description;
 
       document.getElementById('rate-overall').textContent = data.conversionRates.overallConversion.rate;
       document.getElementById('desc-overall').textContent = data.conversionRates.overallConversion.description;
