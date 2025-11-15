@@ -6,6 +6,7 @@ const logger = require('./src/utils/logger');
 const webhookRoutes = require('./src/routes/webhook');
 const oauthRoutes = require('./src/routes/oauth');
 const analyticsRoutes = require('./src/routes/analytics');
+const dashboardRoutes = require('./src/routes/dashboard');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,10 +30,14 @@ app.use('/webhook', limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Servir archivos estáticos (dashboard frontend)
+app.use('/dashboard', express.static('public/dashboard'));
+
 // Rutas
 app.use('/webhook', webhookRoutes);
 app.use('/oauth', oauthRoutes);
 app.use('/api/analytics', analyticsRoutes); // NUEVO: Dashboard de aprendizaje
+app.use('/api/dashboard', dashboardRoutes); // NUEVO: Dashboard API
 
 // Ruta de salud
 app.get('/health', (req, res) => {

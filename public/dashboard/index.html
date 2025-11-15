@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datapify - Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="logo">📊 Datapify</h1>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-page="chat">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">Conversaciones</span>
+          <span class="badge" id="active-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-page="analytics">
+          <span class="nav-icon">📈</span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="#" class="nav-item" data-page="leads">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-text">Leads</span>
+        </a>
+        <a href="#" class="nav-item" data-page="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Configuración</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">I</div>
+          <div class="user-details">
+            <div class="user-name">Ignacio</div>
+            <div class="user-role">Admin</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Page: Chat (Conversaciones) -->
+      <div id="page-chat" class="page active">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Conversaciones</h2>
+            <p class="page-subtitle">Gestiona las conversaciones de WhatsApp en tiempo real</p>
+          </div>
+          <div class="header-actions">
+            <div class="search-box">
+              <input type="text" id="search-input" placeholder="Buscar por teléfono o nombre...">
+            </div>
+            <select id="filter-temperature" class="filter-select">
+              <option value="">Todos los leads</option>
+              <option value="hot">🔥 Hot</option>
+              <option value="warm">🟡 Warm</option>
+              <option value="cold">❄️ Cold</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">💬</div>
+            <div class="stat-details">
+              <div class="stat-label">Total Conversaciones</div>
+              <div class="stat-value" id="stat-total">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔥</div>
+            <div class="stat-details">
+              <div class="stat-label">Hot Leads</div>
+              <div class="stat-value" id="stat-hot">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-details">
+              <div class="stat-label">Reuniones Agendadas</div>
+              <div class="stat-value" id="stat-scheduled">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-details">
+              <div class="stat-label">Tasa de Conversión</div>
+              <div class="stat-value" id="stat-conversion">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Layout -->
+        <div class="chat-layout">
+          <!-- Conversations List -->
+          <div class="conversations-panel">
+            <div class="conversations-header">
+              <h3>Chats</h3>
+              <button class="refresh-btn" id="refresh-btn">🔄</button>
+            </div>
+            <div class="conversations-list" id="conversations-list">
+              <!-- Conversaciones se cargarán aquí dinámicamente -->
+              <div class="loading">Cargando conversaciones...</div>
+            </div>
+          </div>
+
+          <!-- Messages Panel -->
+          <div class="messages-panel">
+            <div class="messages-header" id="messages-header">
+              <div class="empty-state">
+                <p>👈 Selecciona una conversación para ver los mensajes</p>
+              </div>
+            </div>
+            <div class="messages-container" id="messages-container">
+              <!-- Mensajes se cargarán aquí -->
+            </div>
+            <div class="conversation-info-panel" id="conversation-info">
+              <!-- Info del lead se carga aquí -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page: Analytics (placeholder) -->
+      <div id="page-analytics" class="page">
+        <div class="page-header">
+          <h2 class="page-title">Analytics</h2>
+          <p class="page-subtitle">Próximamente...</p>
+        </div>
+      </div>
+
+      <!-- Page: Leads (placeholder) -->
+      <div id="page-leads" class="page">
+        <div class="page-header">
+          <h2 class="page-title">Gestión de Leads</h2>
+          <p class="page-subtitle">Próximamente...</p>
+        </div>
+      </div>
+
+      <!-- Page: Settings (placeholder) -->
+      <div id="page-settings" class="page">
+        <div class="page-header">
+          <h2 class="page-title">Configuración</h2>
+          <p class="page-subtitle">Próximamente...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
