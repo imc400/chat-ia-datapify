@@ -98,6 +98,47 @@ class DashboardController {
           reallyScheduled = calendarCheck.hasScheduled;
           calendarEventCount = calendarCheck.eventCount;
           calendarFormData = calendarCheck.leadData || null; // NUEVO: Extraer datos del formulario
+
+          // SINCRONIZACIÓN AUTOMÁTICA: Actualizar CRM con datos del calendario
+          if (reallyScheduled && calendarFormData && group.leadData) {
+            const needsUpdate =
+              !group.leadData.email ||
+              !group.leadData.website ||
+              !group.leadData.lastName ||
+              !group.leadData.calendarSyncedAt;
+
+            if (needsUpdate) {
+              logger.info('🔄 Sincronizando datos del calendario al CRM', { phone: group.phone });
+
+              await prisma.leadData.update({
+                where: { id: group.leadData.id },
+                data: {
+                  email: calendarFormData.email || group.leadData.email,
+                  website: calendarFormData.sitioWeb || group.leadData.website,
+                  lastName: calendarFormData.apellido || group.leadData.lastName,
+                  name: calendarFormData.nombre || group.leadData.name,
+                  calendarSyncedAt: new Date(),
+                },
+              });
+
+              logger.info('✅ Datos sincronizados desde calendario', {
+                phone: group.phone,
+                syncedFields: {
+                  email: !!calendarFormData.email,
+                  website: !!calendarFormData.sitioWeb,
+                  lastName: !!calendarFormData.apellido,
+                  name: !!calendarFormData.nombre,
+                },
+              });
+
+              // Actualizar el objeto group.leadData para reflejar los cambios
+              group.leadData.email = calendarFormData.email || group.leadData.email;
+              group.leadData.website = calendarFormData.sitioWeb || group.leadData.website;
+              group.leadData.lastName = calendarFormData.apellido || group.leadData.lastName;
+              group.leadData.name = calendarFormData.nombre || group.leadData.name;
+              group.leadData.calendarSyncedAt = new Date();
+            }
+          }
         } catch (error) {
           logger.warn('Error verificando calendario para', group.phone, error.message);
         }
