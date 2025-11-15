@@ -271,6 +271,148 @@ router.get('/prompt-suggestions', async (req, res) => {
 });
 
 /**
+ * GET /api/analytics/funnel
+ * Análisis completo del funnel de conversión por etapas
+ */
+router.get('/funnel', async (req, res) => {
+  try {
+    // 1. ETAPA 1: Total de chats únicos (por teléfono)
+    const totalLeads = await prisma.leadData.count();
+
+    // Obtener todos los leads con sus conversaciones
+    const allLeads = await prisma.leadData.findMany({
+      include: {
+        conversations: true,
+      },
+    });
+
+    // 2. ETAPA 2: Agendaron reunión (scheduledMeeting = true en alguna conversación)
+    const leadsScheduled = allLeads.filter(lead =>
+      lead.conversations.some(conv => conv.scheduledMeeting === true)
+    );
+    const totalScheduled = leadsScheduled.length;
+
+    // 3. ETAPA 3: Empezaron trial de 14 días
+    const leadsTrial = allLeads.filter(lead =>
+      lead.conversionStatus === 'trial_14_days'
+    );
+    const totalTrial = leadsTrial.length;
+
+    // 4. ETAPA 4: Pagaron plan mensual con bonos (directo, sin trial)
+    const leadsPaidBonus = allLeads.filter(lead =>
+      lead.conversionStatus === 'paid_monthly_bonus'
+    );
+    const totalPaidBonus = leadsPaidBonus.length;
+
+    // 5. ETAPA 5: Pagaron después del trial
+    const leadsPaidAfterTrial = allLeads.filter(lead =>
+      lead.conversionStatus === 'paid_after_trial'
+    );
+    const totalPaidAfterTrial = leadsPaidAfterTrial.length;
+
+    // TOTALES
+    const totalConverted = totalPaidBonus + totalPaidAfterTrial; // Total que pagó
+    const totalStartedSomething = totalTrial + totalPaidBonus; // Total que empezó algo (trial O pago directo)
+
+    // TASAS DE CONVERSIÓN
+    const chatToScheduleRate = totalLeads > 0 ? (totalScheduled / totalLeads * 100).toFixed(2) : 0;
+    const scheduleToConversionRate = totalScheduled > 0 ? (totalStartedSomething / totalScheduled * 100).toFixed(2) : 0;
+    const trialToPaymentRate = totalTrial > 0 ? (totalPaidAfterTrial / totalTrial * 100).toFixed(2) : 0;
+    const overallConversionRate = totalLeads > 0 ? (totalConverted / totalLeads * 100).toFixed(2) : 0;
+
+    // REVENUE (asumiendo $199 USD por cliente)
+    const revenuePerClient = 199;
+    const totalRevenue = totalConverted * revenuePerClient;
+    const projectedMonthlyRevenue = totalRevenue; // Si todos son mensuales
+
+    res.json({
+      success: true,
+      data: {
+        funnel: {
+          stage1_chats: {
+            label: '1. Chats Iniciados',
+            count: totalLeads,
+            percentage: '100%',
+            description: 'Total de leads únicos que iniciaron conversación',
+          },
+          stage2_scheduled: {
+            label: '2. Agendaron Reunión',
+            count: totalScheduled,
+            percentage: `${chatToScheduleRate}%`,
+            description: 'Leads que agendaron una reunión',
+            conversionFromPrevious: `${chatToScheduleRate}%`,
+          },
+          stage3_trial: {
+            label: '3. Empezaron Trial (14 días)',
+            count: totalTrial,
+            percentage: `${(totalLeads > 0 ? (totalTrial / totalLeads * 100).toFixed(2) : 0)}%`,
+            description: 'Leads en periodo de prueba de 14 días',
+            conversionFromScheduled: totalScheduled > 0 ? `${(totalTrial / totalScheduled * 100).toFixed(2)}%` : '0%',
+          },
+          stage4_paid_bonus: {
+            label: '4. Pagaron Directo (con bonos)',
+            count: totalPaidBonus,
+            percentage: `${(totalLeads > 0 ? (totalPaidBonus / totalLeads * 100).toFixed(2) : 0)}%`,
+            description: 'Leads que pagaron $199/mes directo con bonos (sin trial)',
+            conversionFromScheduled: totalScheduled > 0 ? `${(totalPaidBonus / totalScheduled * 100).toFixed(2)}%` : '0%',
+          },
+          stage5_paid_after_trial: {
+            label: '5. Pagaron Post-Trial',
+            count: totalPaidAfterTrial,
+            percentage: `${(totalLeads > 0 ? (totalPaidAfterTrial / totalLeads * 100).toFixed(2) : 0)}%`,
+            description: 'Leads que completaron trial y pagaron',
+            conversionFromTrial: `${trialToPaymentRate}%`,
+          },
+        },
+        conversionRates: {
+          chatToSchedule: {
+            label: 'Chat → Agendamiento',
+            rate: `${chatToScheduleRate}%`,
+            description: `${totalScheduled} de ${totalLeads} chats agendaron`,
+          },
+          scheduleToConversion: {
+            label: 'Agendamiento → Conversión (Trial o Pago)',
+            rate: `${scheduleToConversionRate}%`,
+            description: `${totalStartedSomething} de ${totalScheduled} agendados se convirtieron`,
+          },
+          trialToPayment: {
+            label: 'Trial → Pago',
+            rate: `${trialToPaymentRate}%`,
+            description: `${totalPaidAfterTrial} de ${totalTrial} trials pagaron`,
+          },
+          overallConversion: {
+            label: 'Conversión Total (Chat → Pago)',
+            rate: `${overallConversionRate}%`,
+            description: `${totalConverted} de ${totalLeads} chats terminaron pagando`,
+          },
+        },
+        revenue: {
+          totalPaying: totalConverted,
+          revenuePerClient: `$${revenuePerClient} USD`,
+          totalRevenue: `$${totalRevenue.toLocaleString()} USD`,
+          projectedMonthlyRevenue: `$${projectedMonthlyRevenue.toLocaleString()} USD/mes`,
+        },
+        summary: {
+          totalLeads,
+          totalScheduled,
+          totalTrial,
+          totalPaidBonus,
+          totalPaidAfterTrial,
+          totalConverted,
+          totalStartedSomething,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Error obteniendo funnel:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo métricas del funnel',
+    });
+  }
+});
+
+/**
  * GET /api/analytics/leads
  * Listado de todos los leads con filtros
  */
