@@ -86,6 +86,9 @@ model LeadData {
   conversionDate        DateTime? // Fecha en que se convirtió
   conversionNotes       String?  @db.Text // Notas adicionales sobre la conversión
 
+  // FASE 2: Memoria persistente entre conversaciones
+  conversationSummary   String?  @db.Text // Resumen de conversaciones previas para contexto
+
   extractedAt           DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

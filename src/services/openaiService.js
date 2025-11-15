@@ -451,6 +451,51 @@ Incluye un mensaje de bienvenida y confirma los detalles. Máximo 3 líneas.`;
       return `✅ Reunión agendada con éxito para ${meetingData.date} a las ${meetingData.time}. Te esperamos, ${meetingData.name}.`;
     }
   }
+
+  /**
+   * FASE 2: Genera un resumen conciso de la conversación para memoria persistente
+   * Máximo 150 tokens para mantener costos bajos
+   */
+  async generateConversationSummary(messages, leadData) {
+    try {
+      // Formatear mensajes para el resumen
+      const conversationText = messages
+        .map(msg => `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content}`)
+        .join('\n');
+
+      const prompt = `Resume esta conversación de ventas en máximo 2-3 frases cortas. Enfócate en:
+1. ¿Qué busca/necesita el cliente?
+2. Información clave del negocio (plataforma, ingresos, problemas)
+3. Estado de la conversación (interesado/descalificado/agendó)
+
+Cliente: ${leadData?.name || 'Sin nombre'}
+Negocio: ${leadData?.businessType || 'No especificado'}
+
+Conversación:
+${conversationText}
+
+Resumen (máximo 50 palabras):`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini', // Modelo más económico
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 150,
+      });
+
+      const summary = completion.choices[0].message.content.trim();
+      logger.info('📝 Resumen de conversación generado', {
+        messageCount: messages.length,
+        summaryLength: summary.length,
+      });
+
+      return summary;
+    } catch (error) {
+      logger.error('Error generando resumen de conversación:', error);
+      // Fallback: resumen básico sin IA
+      return `Cliente ${leadData?.name || 'anónimo'} - ${messages.length} mensajes intercambiados`;
+    }
+  }
 }
 
 module.exports = new OpenAIService();

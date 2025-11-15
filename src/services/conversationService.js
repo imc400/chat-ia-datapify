@@ -291,9 +291,11 @@ class ConversationService {
 
   /**
    * Marca conversación como completada con outcome
+   * FASE 2: Genera y guarda resumen automático
    */
   async completeConversation(conversationId, outcome, scheduledMeeting = false) {
     try {
+      // Marcar conversación como completada
       await prisma.conversation.update({
         where: { id: conversationId },
         data: {
@@ -309,8 +311,77 @@ class ConversationService {
         outcome,
         scheduledMeeting,
       });
+
+      // FASE 2: Generar resumen en segundo plano (no bloquear)
+      this.generateAndSaveSummary(conversationId).catch(err => {
+        logger.error('Error generando resumen (no crítico):', err);
+      });
     } catch (error) {
       logger.error('Error completando conversación:', error);
+    }
+  }
+
+  /**
+   * FASE 2: Genera y guarda resumen de la conversación en el LeadData
+   */
+  async generateAndSaveSummary(conversationId) {
+    try {
+      // Obtener conversación con mensajes y lead data
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          messages: {
+            orderBy: { timestamp: 'asc' },
+          },
+          leadData: true,
+        },
+      });
+
+      if (!conversation || !conversation.leadData) {
+        logger.warn('No se puede generar resumen: conversación o lead data no encontrado');
+        return;
+      }
+
+      // No generar resumen si la conversación tiene muy pocos mensajes
+      if (conversation.messages.length < 3) {
+        logger.info('Conversación muy corta, no se genera resumen');
+        return;
+      }
+
+      // Generar resumen con OpenAI
+      const openaiService = require('./openaiService');
+      const summary = await openaiService.generateConversationSummary(
+        conversation.messages,
+        conversation.leadData
+      );
+
+      // Actualizar o agregar al resumen existente
+      const phone = conversation.phone;
+      const existingSummary = conversation.leadData.conversationSummary;
+
+      let newSummary;
+      if (existingSummary) {
+        // Combinar resúmenes previos con el nuevo
+        newSummary = `${existingSummary}\n\n[${new Date().toLocaleDateString()}] ${summary}`;
+      } else {
+        newSummary = `[${new Date().toLocaleDateString()}] ${summary}`;
+      }
+
+      // Guardar en LeadData
+      await prisma.leadData.update({
+        where: { phone },
+        data: {
+          conversationSummary: newSummary,
+        },
+      });
+
+      logger.info('📝 Resumen guardado en LeadData', {
+        phone,
+        summaryLength: newSummary.length,
+      });
+    } catch (error) {
+      logger.error('Error en generateAndSaveSummary:', error);
+      throw error;
     }
   }
 
