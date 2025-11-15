@@ -294,19 +294,24 @@ class CalendarService {
 
   /**
    * Normalizar número de teléfono para comparación
-   * Quita +, espacios, guiones, paréntesis
-   * Extrae solo los últimos 9 dígitos (número local chileno)
+   * Maneja formatos chilenos con/sin código de país
+   * 056977788379 → 56977788379
+   * +56977788379 → 56977788379
+   * 56977788379 → 56977788379
    */
   normalizePhone(phone) {
     if (!phone) return '';
 
     // Quitar todo excepto números
-    const cleaned = phone.replace(/[^\d]/g, '');
+    let cleaned = phone.replace(/[^\d]/g, '');
 
-    // Extraer últimos 9 dígitos (número local chileno)
-    // 950160966, 56950160966, +56950160966 → 950160966
-    if (cleaned.length >= 9) {
-      return cleaned.slice(-9);
+    // Quitar ceros iniciales
+    cleaned = cleaned.replace(/^0+/, '');
+
+    // Si tiene 11 dígitos y empieza con 56, es formato completo
+    // Si tiene 9 dígitos, agregar código de país
+    if (cleaned.length === 9) {
+      return `56${cleaned}`;
     }
 
     return cleaned;
@@ -326,12 +331,19 @@ class CalendarService {
       // Normalizar el teléfono de búsqueda
       const normalizedSearchPhone = this.normalizePhone(phone);
 
+      // Extraer solo los 9 dígitos locales (sin código de país)
+      const localPhone = normalizedSearchPhone.startsWith('56') && normalizedSearchPhone.length === 11
+        ? normalizedSearchPhone.slice(2)
+        : normalizedSearchPhone;
+
       // Generar variantes del número para buscar
       const phoneVariants = [
         phone,                          // Original
-        normalizedSearchPhone,          // 950160966
-        `56${normalizedSearchPhone}`,   // 56950160966
-        `+56${normalizedSearchPhone}`,  // +56950160966
+        normalizedSearchPhone,          // 56977788379
+        `0${normalizedSearchPhone}`,    // 056977788379 (con cero inicial)
+        `+${normalizedSearchPhone}`,    // +56977788379
+        localPhone,                     // 977788379 (solo local)
+        `0${localPhone}`,               // 0977788379 (local con cero)
       ];
 
       logger.info('🔍 Buscando eventos en calendario', {
