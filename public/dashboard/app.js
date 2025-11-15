@@ -122,7 +122,7 @@ class DashboardApp {
     }
 
     container.innerHTML = conversations.map(conv => `
-      <div class="conversation-item" data-id="${conv.id}" onclick="app.selectConversation('${conv.id}')">
+      <div class="conversation-item" data-id="${conv.id}">
         <div class="conversation-item-header">
           <span class="conversation-phone">${this.formatPhone(conv.phone)}</span>
           <span class="conversation-time">${this.formatTime(conv.updatedAt)}</span>
@@ -136,6 +136,13 @@ class DashboardApp {
         </div>
       </div>
     `).join('');
+
+    // Agregar event listeners después de renderizar
+    container.querySelectorAll('.conversation-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.selectConversation(item.dataset.id);
+      });
+    });
   }
 
   /**
