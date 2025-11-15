@@ -791,7 +791,14 @@ class DashboardApp {
         <div class="stat-icon">🔄</div>
         <div class="stat-details">
           <div class="stat-label">Trial 14 días</div>
-          <div class="stat-value">${stats.byStatus.trial_14_days}</div>
+          <div class="stat-value">${stats.byStatus.trial_14_days || 0}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">❌</div>
+        <div class="stat-details">
+          <div class="stat-label">Trial sin conversión</div>
+          <div class="stat-value">${stats.byStatus.trial_completed_no_payment || 0}</div>
         </div>
       </div>
     `;
@@ -858,8 +865,9 @@ class DashboardApp {
   renderConversionStatusBadge(status) {
     const badges = {
       trial_14_days: '<span class="status-badge trial">🔄 Trial 14d</span>',
+      trial_completed_no_payment: '<span class="status-badge churn">❌ Trial sin pago</span>',
       paid_monthly_bonus: '<span class="status-badge paid">💰 Mensual + Bonos</span>',
-      paid_after_trial: '<span class="status-badge paid">💰 Pagó post-trial</span>',
+      paid_after_trial: '<span class="status-badge paid">✅ Pagó post-trial</span>',
       none: '<span class="status-badge none">Sin conversión</span>',
     };
     return badges[status] || badges.none;
@@ -882,8 +890,9 @@ class DashboardApp {
           <select id="conversion-status" class="form-select">
             <option value="none" ${currentStatus === 'none' ? 'selected' : ''}>Sin conversión</option>
             <option value="trial_14_days" ${currentStatus === 'trial_14_days' ? 'selected' : ''}>🔄 Empezó 14 días gratis</option>
+            <option value="trial_completed_no_payment" ${currentStatus === 'trial_completed_no_payment' ? 'selected' : ''}>❌ NO contrató post-trial (churn)</option>
             <option value="paid_monthly_bonus" ${currentStatus === 'paid_monthly_bonus' ? 'selected' : ''}>💰 Pagó mensual con bonos</option>
-            <option value="paid_after_trial" ${currentStatus === 'paid_after_trial' ? 'selected' : ''}>💰 Contrató después de trial</option>
+            <option value="paid_after_trial" ${currentStatus === 'paid_after_trial' ? 'selected' : ''}>✅ Contrató después de trial</option>
           </select>
 
           <label for="conversion-notes">Notas (opcional):</label>
