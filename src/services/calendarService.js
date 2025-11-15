@@ -196,6 +196,73 @@ class CalendarService {
         }
       }
 
+  /**
+   * Verificar si un teléfono tiene eventos agendados en Google Calendar
+   * Busca eventos futuros que contengan el teléfono en la descripción
+   */
+  async checkPhoneHasScheduledEvents(phone) {
+    try {
+      const now = moment.tz(this.timezone);
+      const futureLimit = now.clone().add(60, 'days'); // Buscar eventos en los próximos 60 días
+
+      const response = await this.calendar.events.list({
+        calendarId: config.googleCalendar.calendarId,
+        timeMin: now.toISOString(),
+        timeMax: futureLimit.toISOString(),
+        q: phone, // Buscar por el número de teléfono
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+
+      const events = response.data.items || [];
+
+      // Filtrar eventos que realmente contengan el teléfono
+      const matchingEvents = events.filter(event => {
+        const description = event.description || '';
+        const summary = event.summary || '';
+        const attendees = event.attendees || [];
+
+        // Buscar el teléfono en descripción, título o asistentes
+        return description.includes(phone) ||
+               summary.includes(phone) ||
+               attendees.some(a => a.email && a.email.includes(phone));
+      });
+
+      if (matchingEvents.length > 0) {
+        logger.info('✅ Teléfono tiene eventos agendados', {
+          phone,
+          eventCount: matchingEvents.length,
+          nextEvent: matchingEvents[0].start.dateTime,
+        });
+
+        return {
+          hasScheduled: true,
+          eventCount: matchingEvents.length,
+          nextEvent: matchingEvents[0],
+          allEvents: matchingEvents,
+        };
+      }
+
+      return {
+        hasScheduled: false,
+        eventCount: 0,
+      };
+
+    } catch (error) {
+      logger.error('Error verificando eventos en calendario:', {
+        phone,
+        error: error.message,
+      });
+
+      // Si hay error, retornar false para no bloquear el flujo
+      return {
+        hasScheduled: false,
+        eventCount: 0,
+        error: error.message,
+      };
+    }
+  }
+
       logger.info('📅 Horarios disponibles obtenidos', {
         count: availableSlots.length,
       });

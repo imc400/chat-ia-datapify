@@ -60,9 +60,9 @@ class DashboardApp {
       this.loadConversations();
     });
 
-    // Filtro por temperatura
-    document.getElementById('filter-temperature').addEventListener('change', (e) => {
-      this.loadConversations(e.target.value);
+    // Filtro por estado
+    document.getElementById('filter-status').addEventListener('change', (e) => {
+      this.filterByStatus(e.target.value);
     });
 
     // Búsqueda
@@ -131,9 +131,9 @@ class DashboardApp {
           ${conv.lastMessage ? this.truncate(conv.lastMessage.content, 60) : 'Sin mensajes'}
         </div>
         <div class="conversation-meta">
-          <span class="lead-badge ${conv.leadTemperature}">${this.formatTemperature(conv.leadTemperature)}</span>
+          ${conv.leadData?.hasShopify ? '<span class="lead-badge shopify">🛍️ Shopify</span>' : ''}
+          ${conv.scheduledMeeting ? `<span class="meeting-badge">📅 Agendado${conv.calendarEventCount > 1 ? ` (${conv.calendarEventCount})` : ''}</span>` : ''}
           ${conv.conversationCount > 1 ? `<span class="conversation-count-badge">${conv.conversationCount} conversaciones</span>` : ''}
-          ${conv.scheduledMeeting ? '<span class="meeting-badge">📅 Reunión</span>' : ''}
         </div>
       </div>
     `).join('');
@@ -160,6 +160,31 @@ class DashboardApp {
       const name = conv.leadData?.name?.toLowerCase() || '';
       const q = query.toLowerCase();
       return phone.includes(q) || name.includes(q);
+    });
+
+    this.renderConversations(filtered);
+  }
+
+  /**
+   * Filtrar conversaciones por estado (Shopify, Agendado, Activo)
+   */
+  filterByStatus(status) {
+    if (!status) {
+      this.renderConversations(this.conversations);
+      return;
+    }
+
+    const filtered = this.conversations.filter(conv => {
+      switch (status) {
+        case 'shopify':
+          return conv.leadData?.hasShopify === true;
+        case 'scheduled':
+          return conv.scheduledMeeting === true;
+        case 'active':
+          return conv.status === 'active';
+        default:
+          return true;
+      }
     });
 
     this.renderConversations(filtered);

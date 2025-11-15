@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
+const calendarService = require('../services/calendarService');
 
 const prisma = new PrismaClient();
 
@@ -85,22 +86,37 @@ class DashboardController {
       // Aplicar paginación
       const paginated = grouped.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
 
-      // Formatear respuesta
-      const formatted = paginated.map(group => ({
-        phone: group.phone,
-        conversationCount: group.conversations.length,
-        conversationIds: group.conversations.map(c => c.id),
-        status: group.conversations[0].status,
-        outcome: group.conversations[0].outcome,
-        leadTemperature: group.leadTemperature,
-        leadScore: group.leadScore,
-        scheduledMeeting: group.scheduledMeeting,
-        startedAt: group.conversations[group.conversations.length - 1].startedAt, // Primera conversación
-        updatedAt: group.lastUpdate,
-        lastMessage: group.lastMessage,
-        leadData: group.leadData,
-        messageCount: group.totalMessages,
-        unreadCount: 0,
+      // Formatear respuesta y verificar agendamiento REAL en Google Calendar
+      const formatted = await Promise.all(paginated.map(async (group) => {
+        // Verificar si tiene evento REAL en Google Calendar
+        let reallyScheduled = false;
+        let calendarEventCount = 0;
+
+        try {
+          const calendarCheck = await calendarService.checkPhoneHasScheduledEvents(group.phone);
+          reallyScheduled = calendarCheck.hasScheduled;
+          calendarEventCount = calendarCheck.eventCount;
+        } catch (error) {
+          logger.warn('Error verificando calendario para', group.phone, error.message);
+        }
+
+        return {
+          phone: group.phone,
+          conversationCount: group.conversations.length,
+          conversationIds: group.conversations.map(c => c.id),
+          status: group.conversations[0].status,
+          outcome: group.conversations[0].outcome,
+          leadTemperature: group.leadTemperature,
+          leadScore: group.leadScore,
+          scheduledMeeting: reallyScheduled, // Ahora es verificación REAL
+          calendarEventCount: calendarEventCount, // Cantidad de eventos en calendario
+          startedAt: group.conversations[group.conversations.length - 1].startedAt,
+          updatedAt: group.lastUpdate,
+          lastMessage: group.lastMessage,
+          leadData: group.leadData,
+          messageCount: group.totalMessages,
+          unreadCount: 0,
+        };
       }));
 
       res.json({
