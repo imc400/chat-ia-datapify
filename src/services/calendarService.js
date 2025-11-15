@@ -293,38 +293,92 @@ class CalendarService {
   }
 
   /**
+   * Normalizar número de teléfono para comparación
+   * Quita +, espacios, guiones, paréntesis
+   * Extrae solo los últimos 9 dígitos (número local chileno)
+   */
+  normalizePhone(phone) {
+    if (!phone) return '';
+
+    // Quitar todo excepto números
+    const cleaned = phone.replace(/[^\d]/g, '');
+
+    // Extraer últimos 9 dígitos (número local chileno)
+    // 950160966, 56950160966, +56950160966 → 950160966
+    if (cleaned.length >= 9) {
+      return cleaned.slice(-9);
+    }
+
+    return cleaned;
+  }
+
+  /**
    * Verificar si un teléfono tiene eventos agendados en Google Calendar
    * Busca eventos futuros que contengan el teléfono en la descripción
    * AHORA extrae y valida los datos del formulario de cada evento
+   * MEJORA: Normaliza números para buscar todas las variantes
    */
   async checkPhoneHasScheduledEvents(phone) {
     try {
       const now = moment.tz(this.timezone);
       const futureLimit = now.clone().add(60, 'days'); // Buscar eventos en los próximos 60 días
 
-      const response = await this.calendar.events.list({
-        calendarId: config.googleCalendar.calendarId,
-        timeMin: now.toISOString(),
-        timeMax: futureLimit.toISOString(),
-        q: phone, // Buscar por el número de teléfono
-        singleEvents: true,
-        orderBy: 'startTime',
+      // Normalizar el teléfono de búsqueda
+      const normalizedSearchPhone = this.normalizePhone(phone);
+
+      // Generar variantes del número para buscar
+      const phoneVariants = [
+        phone,                          // Original
+        normalizedSearchPhone,          // 950160966
+        `56${normalizedSearchPhone}`,   // 56950160966
+        `+56${normalizedSearchPhone}`,  // +56950160966
+      ];
+
+      logger.info('🔍 Buscando eventos en calendario', {
+        originalPhone: phone,
+        normalizedPhone: normalizedSearchPhone,
+        searchVariants: phoneVariants,
       });
 
-      const events = response.data.items || [];
+      // Buscar con todas las variantes
+      let allEvents = [];
+      for (const variant of phoneVariants) {
+        try {
+          const response = await this.calendar.events.list({
+            calendarId: config.googleCalendar.calendarId,
+            timeMin: now.toISOString(),
+            timeMax: futureLimit.toISOString(),
+            q: variant,
+            singleEvents: true,
+            orderBy: 'startTime',
+          });
+
+          if (response.data.items && response.data.items.length > 0) {
+            allEvents.push(...response.data.items);
+          }
+        } catch (searchError) {
+          logger.warn(`Error buscando con variante ${variant}:`, searchError.message);
+        }
+      }
+
+      // Eliminar duplicados por ID
+      const uniqueEvents = Array.from(
+        new Map(allEvents.map(event => [event.id, event])).values()
+      );
 
       // Filtrar y enriquecer eventos que realmente contengan el teléfono
-      const matchingEvents = events
+      const matchingEvents = uniqueEvents
         .map(event => {
           const formData = this.extractEventFormData(event);
 
-          // Normalizar teléfonos para comparación (quitar espacios, guiones, etc)
-          const normalizePhone = (p) => p ? p.replace(/[\s\-()]/g, '') : '';
-          const eventPhone = normalizePhone(formData.telefono);
-          const searchPhone = normalizePhone(phone);
+          // Normalizar teléfonos para comparación
+          const eventPhone = this.normalizePhone(formData.telefono);
 
-          // Verificar si el teléfono coincide
-          const phoneMatches = eventPhone.includes(searchPhone) || searchPhone.includes(eventPhone);
+          // Verificar si el teléfono coincide (comparar últimos 9 dígitos)
+          const phoneMatches =
+            eventPhone === normalizedSearchPhone ||
+            eventPhone.includes(normalizedSearchPhone) ||
+            normalizedSearchPhone.includes(eventPhone);
 
           return {
             ...event,
@@ -337,8 +391,9 @@ class CalendarService {
       if (matchingEvents.length > 0) {
         logger.info('✅ Teléfono tiene eventos agendados', {
           phone,
+          normalizedPhone: normalizedSearchPhone,
           eventCount: matchingEvents.length,
-          nextEvent: matchingEvents[0].start.dateTime,
+          nextEvent: matchingEvents[0].start.dateTime || matchingEvents[0].start.date,
           extractedData: matchingEvents[0].formData,
         });
 
@@ -351,6 +406,13 @@ class CalendarService {
           leadData: matchingEvents[0].formData,
         };
       }
+
+      logger.info('❌ No se encontraron eventos para el teléfono', {
+        phone,
+        normalizedPhone: normalizedSearchPhone,
+        searchedVariants: phoneVariants,
+        totalEventsFound: uniqueEvents.length,
+      });
 
       return {
         hasScheduled: false,
