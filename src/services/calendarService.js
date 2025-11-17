@@ -462,24 +462,57 @@ class CalendarService {
         new Map(allEvents.map(event => [event.id, event])).values()
       );
 
+      // SI NO SE ENCONTRARON EVENTOS con búsqueda, hacer búsqueda amplia (fallback)
+      if (uniqueEvents.length === 0) {
+        logger.info('⚠️ No se encontraron eventos con búsqueda específica, buscando todos los eventos...');
+
+        try {
+          const allEventsResponse = await this.calendar.events.list({
+            calendarId: config.googleCalendar.calendarId,
+            timeMin: now.toISOString(),
+            timeMax: futureLimit.toISOString(),
+            singleEvents: true,
+            orderBy: 'startTime',
+            maxResults: 100
+          });
+
+          if (allEventsResponse.data.items) {
+            allEvents = allEventsResponse.data.items;
+          }
+        } catch (fallbackError) {
+          logger.warn('Error en búsqueda amplia de eventos:', fallbackError.message);
+        }
+      }
+
       // Filtrar y enriquecer eventos que realmente contengan el teléfono
-      const matchingEvents = uniqueEvents
+      const matchingEvents = (uniqueEvents.length > 0 ? uniqueEvents : allEvents)
         .map(event => {
           const formData = this.extractEventFormData(event);
 
           // Normalizar teléfonos para comparación
           const eventPhone = this.normalizePhone(formData.telefono);
 
+          // Extraer los últimos 9 dígitos de ambos números para comparación robusta
+          const searchLast9 = normalizedSearchPhone.slice(-9);
+          const eventLast9 = eventPhone.slice(-9);
+
           // Verificar si el teléfono coincide (comparar últimos 9 dígitos)
           const phoneMatches =
             eventPhone === normalizedSearchPhone ||
             eventPhone.includes(normalizedSearchPhone) ||
-            normalizedSearchPhone.includes(eventPhone);
+            normalizedSearchPhone.includes(eventPhone) ||
+            (searchLast9.length === 9 && eventLast9.length === 9 && searchLast9 === eventLast9);
 
           return {
             ...event,
             formData,
             phoneMatches,
+            debugInfo: {
+              eventPhone,
+              normalizedSearchPhone,
+              searchLast9,
+              eventLast9
+            }
           };
         })
         .filter(event => event.phoneMatches);
