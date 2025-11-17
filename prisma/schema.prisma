@@ -25,6 +25,7 @@ model Conversation {
   leadTemperature   String   @default("cold") // 'hot', 'warm', 'cold'
   leadScore         Int      @default(0) // 0-10
   scheduledMeeting  Boolean  @default(false)
+  lastReadAt        DateTime? // Última vez que el agente leyó esta conversación en el dashboard
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

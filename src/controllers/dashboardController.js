@@ -50,6 +50,8 @@ class DashboardController {
             lastMessage: null,
             lastUpdate: conv.updatedAt,
             totalMessages: 0,
+            unreadCount: 0, // NUEVO: Contador de mensajes no leídos
+            lastReadAt: null, // NUEVO: Última vez que se leyó esta conversación
             leadData: null,
             leadTemperature: conv.leadTemperature,
             leadScore: conv.leadScore,
@@ -64,6 +66,12 @@ class DashboardController {
         if (new Date(conv.updatedAt) > new Date(groupedByPhone[conv.phone].lastUpdate)) {
           groupedByPhone[conv.phone].lastUpdate = conv.updatedAt;
           groupedByPhone[conv.phone].lastMessage = conv.messages[0] || null;
+        }
+
+        // Tomar el lastReadAt más reciente entre todas las conversaciones del teléfono
+        if (conv.lastReadAt && (!groupedByPhone[conv.phone].lastReadAt ||
+            new Date(conv.lastReadAt) > new Date(groupedByPhone[conv.phone].lastReadAt))) {
+          groupedByPhone[conv.phone].lastReadAt = conv.lastReadAt;
         }
 
         // Tomar el leadData más reciente
@@ -89,7 +97,25 @@ class DashboardController {
         }
       });
 
-      // Convertir a array y ordenar por última actividad
+      // Calcular mensajes no leídos para cada grupo
+      for (const group of Object.values(groupedByPhone)) {
+        // Contar mensajes del usuario que llegaron después de lastReadAt
+        const unreadCount = await prisma.message.count({
+          where: {
+            conversationId: {
+              in: group.conversations.map(c => c.id),
+            },
+            role: 'user', // Solo mensajes del usuario, no del asistente
+            timestamp: group.lastReadAt ? {
+              gt: group.lastReadAt, // Mensajes posteriores a la última lectura
+            } : undefined, // Si nunca se ha leído, contar todos
+          },
+        });
+
+        group.unreadCount = unreadCount;
+      }
+
+      // Convertir a array y ordenar por última actividad (como WhatsApp)
       const grouped = Object.values(groupedByPhone)
         .sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
 
@@ -198,7 +224,7 @@ class DashboardController {
           lastMessage: group.lastMessage,
           leadData: group.leadData,
           messageCount: group.totalMessages,
-          unreadCount: 0,
+          unreadCount: group.unreadCount, // NUEVO: Contador real de mensajes no leídos
         };
       }));
 
@@ -809,6 +835,49 @@ class DashboardController {
       res.status(500).json({
         success: false,
         error: 'Error obteniendo estadísticas',
+      });
+    }
+  }
+
+  /**
+   * Marcar conversación como leída
+   * Actualiza lastReadAt para todas las conversaciones de un teléfono
+   */
+  async markAsRead(req, res) {
+    try {
+      const { phone } = req.params;
+
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          error: 'Teléfono requerido',
+        });
+      }
+
+      // Actualizar lastReadAt para todas las conversaciones de este teléfono
+      const updated = await prisma.conversation.updateMany({
+        where: { phone },
+        data: { lastReadAt: new Date() },
+      });
+
+      logger.info(`📖 Conversaciones marcadas como leídas para ${phone}`, {
+        count: updated.count,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          phone,
+          conversationsUpdated: updated.count,
+          markedAt: new Date(),
+        },
+      });
+
+    } catch (error) {
+      logger.error('Error marcando conversación como leída:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error marcando como leída',
       });
     }
   }

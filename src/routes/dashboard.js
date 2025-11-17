@@ -30,4 +30,7 @@ router.get('/leads', dashboardController.getLeads);
 // PATCH /api/dashboard/leads/:phone/conversion - Actualizar estado de conversión de un lead
 router.patch('/leads/:phone/conversion', dashboardController.updateLeadConversionStatus);
 
+// POST /api/dashboard/phone/:phone/mark-read - Marcar conversación como leída
+router.post('/phone/:phone/mark-read', dashboardController.markAsRead);
+
 module.exports = router;
