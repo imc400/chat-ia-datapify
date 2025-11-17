@@ -1003,126 +1003,100 @@ class DashboardController {
         responseStatus,
       } = req.body;
 
-      // Construir filtros para leadData
-      const leadWhere = {};
-
-      // Filtro de Shopify: manejar true, false, y undefined (todos)
-      if (hasShopify === true) {
-        leadWhere.hasShopify = true;
-      } else if (hasShopify === false) {
-        // CRÍTICO: Filtrar explícitamente por false O null
-        leadWhere.OR = [
-          { hasShopify: false },
-          { hasShopify: null },
-        ];
-      }
-      // Si hasShopify === undefined, no agregar filtro (mostrar todos)
-
-      if (conversionStatus && conversionStatus !== 'all') {
-        if (conversionStatus === 'none') {
-          leadWhere.conversionStatus = null;
-        } else {
-          leadWhere.conversionStatus = conversionStatus;
-        }
-      }
-
-      // Obtener leads que cumplen los criterios
-      const leads = await prisma.leadData.findMany({
-        where: leadWhere,
+      // ⭐ CAMBIO CRÍTICO: Consultar desde Conversation (no LeadData)
+      // Esto incluye conversaciones SIN leadData (los que aparecen grises en Chat)
+      const conversations = await prisma.conversation.findMany({
         include: {
-          conversations: {
-            include: {
-              messages: {
-                orderBy: { timestamp: 'desc' },
-                take: 1,
-              },
-            },
-            orderBy: { updatedAt: 'desc' },
+          leadData: true,
+          messages: {
+            orderBy: { timestamp: 'desc' },
+            take: 1,
           },
         },
+        orderBy: { updatedAt: 'desc' },
       });
 
-      // Filtrar por criterios adicionales
-      let filteredLeads = leads;
+      // Agrupar por teléfono (tomar la más reciente)
+      const grouped = {};
+      conversations.forEach(conv => {
+        if (!grouped[conv.phone] || new Date(conv.updatedAt) > new Date(grouped[conv.phone].updatedAt)) {
+          grouped[conv.phone] = conv;
+        }
+      });
+
+      let filteredConvs = Object.values(grouped);
+
+      // Aplicar filtros sobre las conversaciones
+
+      // Filtrar por hasShopify
+      if (hasShopify === true) {
+        filteredConvs = filteredConvs.filter(conv => conv.leadData?.hasShopify === true);
+      } else if (hasShopify === false) {
+        filteredConvs = filteredConvs.filter(conv => !conv.leadData?.hasShopify);
+      }
 
       // Filtrar por scheduled
       if (scheduled === true) {
-        filteredLeads = filteredLeads.filter(lead =>
-          lead.conversations.some(conv => conv.scheduledMeeting)
-        );
+        filteredConvs = filteredConvs.filter(conv => conv.scheduledMeeting === true);
       } else if (scheduled === false) {
-        filteredLeads = filteredLeads.filter(lead =>
-          !lead.conversations.some(conv => conv.scheduledMeeting)
+        filteredConvs = filteredConvs.filter(conv => conv.scheduledMeeting === false);
+      }
+
+      // Filtrar por conversionStatus
+      if (conversionStatus && conversionStatus !== 'all') {
+        filteredConvs = filteredConvs.filter(conv =>
+          conv.leadData?.conversionStatus === conversionStatus
         );
       }
 
       // Filtrar por temperatura
       if (leadTemperature && leadTemperature !== 'all') {
-        filteredLeads = filteredLeads.filter(lead => {
-          const bestTemp = lead.conversations.reduce((best, c) => {
-            const tempPriority = { hot: 3, warm: 2, cold: 1 };
-            return (tempPriority[c.leadTemperature] || 0) > (tempPriority[best] || 0)
-              ? c.leadTemperature
-              : best;
-          }, 'cold');
-          return bestTemp === leadTemperature;
-        });
+        filteredConvs = filteredConvs.filter(conv => conv.leadTemperature === leadTemperature);
       }
 
       // Filtrar por lead score mínimo
       if (minLeadScore && minLeadScore > 0) {
-        filteredLeads = filteredLeads.filter(lead => {
-          const bestScore = Math.max(...lead.conversations.map(c => c.leadScore), 0);
-          return bestScore >= minLeadScore;
-        });
+        filteredConvs = filteredConvs.filter(conv => (conv.leadScore || 0) >= minLeadScore);
       }
 
       // Filtrar por responseStatus (sin respuesta = avatares grises)
       if (responseStatus === 'no-response') {
-        filteredLeads = filteredLeads.filter(lead => {
-          // MISMA LÓGICA que getAvatarColor() -> 'avatar-default'
-          const hasScheduled = lead.conversations.some(c => c.scheduledMeeting);
-          if (hasScheduled) return false; // Excluir agendados (azul)
-          if (lead.hasShopify) return false; // Excluir con Shopify (verde)
+        filteredConvs = filteredConvs.filter(conv => {
+          // MISMA LÓGICA que getAvatarColor() en app.js:736-742
+          // Los grises son los que NO son:
+          // - Azul: scheduledMeeting = true
+          // - Verde: hasShopify = true
+          // - Rojo: leadTemperature = 'hot'
+          // - Naranja: leadTemperature = 'warm'
 
-          const bestTemp = lead.conversations.reduce((best, c) => {
-            const tempPriority = { hot: 3, warm: 2, cold: 1 };
-            return (tempPriority[c.leadTemperature] || 0) > (tempPriority[best] || 0)
-              ? c.leadTemperature
-              : best;
-          }, 'cold');
+          if (conv.scheduledMeeting) return false; // Excluir agendados (azul)
+          if (conv.leadData?.hasShopify) return false; // Excluir con Shopify (verde)
+          if (conv.leadTemperature === 'hot') return false; // Excluir hot (rojo)
+          if (conv.leadTemperature === 'warm') return false; // Excluir warm (naranja)
 
-          if (bestTemp === 'hot') return false; // Excluir hot (rojo)
-          if (bestTemp === 'warm') return false; // Excluir warm (naranja)
-
-          // Lo que queda son los "cold" -> avatar gris
+          // Lo que queda son los "cold" o null -> avatar gris
           return true;
         });
       } else if (responseStatus === 'active') {
         // Leads activos: última mensaje es del usuario
-        filteredLeads = filteredLeads.filter(lead => {
-          const latestConv = lead.conversations[0];
-          const lastMsg = latestConv?.messages[0];
+        filteredConvs = filteredConvs.filter(conv => {
+          const lastMsg = conv.messages[0];
           return lastMsg && lastMsg.role === 'user';
         });
       }
 
       // Formatear respuesta con información útil
-      const recipients = filteredLeads.map(lead => {
-        const latestConv = lead.conversations[0];
-        const bestScore = Math.max(...lead.conversations.map(c => c.leadScore), 0);
-        const hasScheduled = lead.conversations.some(c => c.scheduledMeeting);
-
+      const recipients = filteredConvs.map(conv => {
         return {
-          phone: lead.phone,
-          name: lead.name || 'Sin nombre',
-          businessType: lead.businessType || 'No especificado',
-          hasShopify: lead.hasShopify,
-          leadScore: bestScore,
-          scheduledMeeting: hasScheduled,
-          conversionStatus: lead.conversionStatus,
-          lastMessage: latestConv?.messages[0]?.content || 'Sin mensajes',
-          lastActivity: latestConv?.updatedAt || lead.updatedAt,
+          phone: conv.phone,
+          name: conv.leadData?.name || 'Sin nombre',
+          businessType: conv.leadData?.businessType || 'No especificado',
+          hasShopify: conv.leadData?.hasShopify || false,
+          leadScore: conv.leadScore || 0,
+          scheduledMeeting: conv.scheduledMeeting || false,
+          conversionStatus: conv.leadData?.conversionStatus || 'not_started',
+          lastMessage: conv.messages[0]?.content || 'Sin mensajes',
+          lastActivity: conv.updatedAt,
         };
       });
 
@@ -1131,7 +1105,7 @@ class DashboardController {
 
       logger.info('👁️ Preview de destinatarios generado', {
         totalRecipients: recipients.length,
-        filters: { hasShopify, scheduled, conversionStatus, leadTemperature, minLeadScore },
+        filters: { hasShopify, scheduled, conversionStatus, leadTemperature, minLeadScore, responseStatus },
       });
 
       res.json(serializeBigInt({
