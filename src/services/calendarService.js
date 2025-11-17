@@ -269,47 +269,106 @@ class CalendarService {
       formData.telefono = props.phone || props.telefono || null;
       formData.sitioWeb = props.website || props.sitioWeb || null;
     }
-    // Evento manual
+    // Evento manual o Google Appointment (sin extendedProperties)
     else {
-      formData.source = 'manual';
+      // Detectar si es Google Appointment por el formato HTML de la descripción
+      // Formato: "<b>Programada por</b>\nNombre\nemail\ntelefono\n<br><b>Sitio Web</b>\nwebsite"
+      if (description.includes('<b>Programada por</b>')) {
+        formData.source = 'google_appointment';
 
-      // Intentar extraer nombre desde el summary
-      // Formato común: "Onboarding Datapify (Nombre Apellido)"
-      const summaryNameMatch = summary.match(/\(([^)]+)\)/);
-      if (summaryNameMatch) {
-        const nombreCompleto = summaryNameMatch[1].trim();
-        const partes = nombreCompleto.split(' ');
-        if (partes.length >= 2) {
-          formData.nombre = partes[0];
-          formData.apellido = partes.slice(1).join(' ');
-        } else {
-          formData.nombre = nombreCompleto;
+        // Parsear el formato HTML de Google Appointment
+        // Ejemplo real:
+        // <b>Programada por</b>
+        // juan fernando ortega perez
+        // jop087@gmail.com
+        // 931079702
+        // <br><b>Sitio Web</b>
+        // Novacompracl
+
+        // Extraer sección entre "Programada por" y "Sitio Web"
+        const programadaPorMatch = description.match(/<b>Programada por<\/b>\s*\n([^<]+)/);
+        if (programadaPorMatch) {
+          const lines = programadaPorMatch[1].trim().split('\n').map(l => l.trim()).filter(l => l);
+
+          // Primera línea: Nombre completo
+          if (lines[0]) {
+            const nombreCompleto = lines[0];
+            const partes = nombreCompleto.split(' ');
+            if (partes.length >= 2) {
+              formData.nombre = partes[0];
+              formData.apellido = partes.slice(1).join(' ');
+            } else {
+              formData.nombre = nombreCompleto;
+            }
+          }
+
+          // Segunda línea: Email
+          if (lines[1] && lines[1].includes('@')) {
+            formData.email = lines[1];
+          }
+
+          // Tercera línea: Teléfono (puede tener o no el +56)
+          if (lines[2]) {
+            // Limpiar el teléfono: solo números
+            const phoneClean = lines[2].replace(/[^\d]/g, '');
+            // Si tiene 9 dígitos y empieza con 9, es un número chileno sin código
+            if (phoneClean.length === 9 && phoneClean.startsWith('9')) {
+              formData.telefono = `56${phoneClean}`;
+            } else {
+              formData.telefono = phoneClean;
+            }
+          }
         }
-      }
 
-      // Intentar extraer teléfono de la descripción con regex
-      const phoneRegex = /\+?\d[\d\s\-()]{8,}/;
-      const phoneMatch = description.match(phoneRegex);
-      if (phoneMatch) {
-        formData.telefono = phoneMatch[0].trim();
-      }
-
-      // Extraer email de attendees
-      if (event.attendees && event.attendees.length > 0) {
-        const attendee = event.attendees.find(a => a.email && !a.organizer);
-        if (attendee) {
-          formData.email = attendee.email;
+        // Extraer sitio web
+        const websiteMatch = description.match(/<b>Sitio Web<\/b>\s*\n([^\n<]+)/);
+        if (websiteMatch) {
+          const website = websiteMatch[1].trim();
+          // Solo guardar si no es texto genérico
+          if (website && website.length > 3 && !['hola', 'hello', 'hi', 'no', 'ninguno'].includes(website.toLowerCase())) {
+            formData.sitioWeb = website;
+          }
         }
-      }
+      } else {
+        // Evento manual tradicional
+        formData.source = 'manual';
 
-      // Intentar extraer website de la descripción
-      // Buscar línea que diga "Sitio Web" o campos HTML
-      const websiteMatch = description.match(/<b>Sitio Web<\/b>\s*\n([^\n<]+)/);
-      if (websiteMatch) {
-        const website = websiteMatch[1].trim();
-        // Solo guardar si no es "Hola" u otros textos genéricos
-        if (website && website.length > 3 && !['hola', 'hello', 'hi'].includes(website.toLowerCase())) {
-          formData.sitioWeb = website;
+        // Intentar extraer nombre desde el summary
+        // Formato común: "Onboarding Datapify (Nombre Apellido)"
+        const summaryNameMatch = summary.match(/\(([^)]+)\)/);
+        if (summaryNameMatch) {
+          const nombreCompleto = summaryNameMatch[1].trim();
+          const partes = nombreCompleto.split(' ');
+          if (partes.length >= 2) {
+            formData.nombre = partes[0];
+            formData.apellido = partes.slice(1).join(' ');
+          } else {
+            formData.nombre = nombreCompleto;
+          }
+        }
+
+        // Intentar extraer teléfono de la descripción con regex
+        const phoneRegex = /\+?\d[\d\s\-()]{8,}/;
+        const phoneMatch = description.match(phoneRegex);
+        if (phoneMatch) {
+          formData.telefono = phoneMatch[0].trim();
+        }
+
+        // Extraer email de attendees
+        if (event.attendees && event.attendees.length > 0) {
+          const attendee = event.attendees.find(a => a.email && !a.organizer);
+          if (attendee) {
+            formData.email = attendee.email;
+          }
+        }
+
+        // Intentar extraer website de la descripción
+        const websiteMatch = description.match(/<b>Sitio Web<\/b>\s*\n([^\n<]+)/);
+        if (websiteMatch) {
+          const website = websiteMatch[1].trim();
+          if (website && website.length > 3 && !['hola', 'hello', 'hi'].includes(website.toLowerCase())) {
+            formData.sitioWeb = website;
+          }
         }
       }
     }
