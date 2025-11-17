@@ -430,9 +430,9 @@ class CalendarService {
 
       // Cache expiró, buscar todos los eventos
       const momentNow = moment.tz(this.timezone);
-      const futureLimit = momentNow.clone().add(60, 'days');
+      const futureLimit = momentNow.clone().add(15, 'days');
 
-      logger.info('📅 Obteniendo TODOS los eventos futuros (próximos 60 días)...');
+      logger.info('📅 Obteniendo eventos de onboarding (próximos 15 días)...');
 
       const response = await this.calendar.events.list({
         calendarId: config.googleCalendar.calendarId,
@@ -516,25 +516,35 @@ class CalendarService {
         .map(event => {
           const formData = this.extractEventFormData(event);
 
+          // Si no hay teléfono en el evento, no puede matchear
+          if (!formData.telefono) {
+            return {
+              ...event,
+              formData,
+              phoneMatches: false,
+              debugInfo: { reason: 'No phone in event' }
+            };
+          }
+
           // Normalizar teléfonos para comparación
           const eventPhone = this.normalizePhone(formData.telefono);
+
+          // Solo comparar si ambos teléfonos tienen al menos 9 dígitos
+          if (eventPhone.length < 9 || normalizedSearchPhone.length < 9) {
+            return {
+              ...event,
+              formData,
+              phoneMatches: false,
+              debugInfo: { reason: 'Phone too short', eventPhone, normalizedSearchPhone }
+            };
+          }
 
           // Extraer los últimos 9 dígitos de ambos números para comparación robusta
           const searchLast9 = normalizedSearchPhone.slice(-9);
           const eventLast9 = eventPhone.slice(-9);
 
-          // Verificar si el teléfono coincide con alguna variante
-          const phoneMatches =
-            eventPhone === normalizedSearchPhone ||
-            eventPhone.includes(normalizedSearchPhone) ||
-            normalizedSearchPhone.includes(eventPhone) ||
-            (searchLast9.length === 9 && eventLast9.length === 9 && searchLast9 === eventLast9) ||
-            // También verificar si la descripción contiene alguna variante
-            phoneVariants.some(variant => {
-              const desc = (event.description || '').toLowerCase();
-              const summary = (event.summary || '').toLowerCase();
-              return desc.includes(variant.toLowerCase()) || summary.includes(variant.toLowerCase());
-            });
+          // Matching estricto: Solo comparar los últimos 9 dígitos (número local chileno)
+          const phoneMatches = searchLast9 === eventLast9;
 
           return {
             ...event,
@@ -544,7 +554,8 @@ class CalendarService {
               eventPhone,
               normalizedSearchPhone,
               searchLast9,
-              eventLast9
+              eventLast9,
+              matched: phoneMatches
             }
           };
         })
