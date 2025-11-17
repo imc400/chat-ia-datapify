@@ -296,7 +296,7 @@ class BehaviourController {
     // Lo que NO sabemos (esto es lo importante)
     let missing = [];
     if (!state.hasOnlineStore) missing.push('¿Tiene tienda online?');
-    if (state.hasOnlineStore && !state.platform) missing.push('¿Qué plataforma usa? (CRÍTICO: necesitas confirmar Shopify)');
+    if (state.hasOnlineStore && !state.platform) missing.push('🚨 CRÍTICO: ¿Qué plataforma usa? DEBES preguntarlo AHORA antes de continuar');
     if (state.platform === 'shopify' && !state.hasBusinessInfo) missing.push('¿Qué vende?');
     if (state.platform === 'shopify' && !state.askedAboutAds) missing.push('¿Cómo le va con publicidad/ventas? ¿Tiene problemas?');
     if (state.platform === 'shopify' && state.askedAboutAds && !state.hasPainPoint) missing.push('¿Realmente tiene un problema? (si le va bien, no necesita Datapify)');
@@ -315,7 +315,17 @@ class BehaviourController {
 
     // Si ya tiene todo y tiene dolor → ofrece reunión
     if (state.platform === 'shopify' && state.hasPainPoint && !state.alreadyOfferedMeeting) {
-      finalInstructions += `\n\n✅ Tiene Shopify + problema confirmado\nMomento de ofrecer reunión: "¿Te tinca una llamada de 30 min?"`;
+      finalInstructions += `\n\n✅ CALIFICADO CORRECTAMENTE:
+- Plataforma: Shopify confirmado ✓
+- Problema detectado ✓
+- Ofrecer reunión: "¿Te tinca una llamada de 30 min para ver cómo te podemos ayudar?"`;
+    }
+
+    // BLOQUEO CRÍTICO: Tiene dolor pero NO confirmó plataforma
+    if (state.hasPainPoint && !state.platform && !state.alreadyOfferedMeeting) {
+      finalInstructions += `\n\n🚫 PROHIBIDO OFRECER REUNIÓN
+Razón: Usuario expresó problema pero NO has confirmado que use Shopify
+Próxima pregunta OBLIGATORIA: "¿En qué plataforma está tu tienda? ¿Shopify, WooCommerce...?"`;
     }
 
     // Si ya ofreció reunión

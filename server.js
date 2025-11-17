@@ -8,6 +8,7 @@ const oauthRoutes = require('./src/routes/oauth');
 const analyticsRoutes = require('./src/routes/analytics');
 const dashboardRoutes = require('./src/routes/dashboard');
 const testCalendarRoutes = require('./src/routes/test-calendar');
+const calendarSyncJob = require('./src/jobs/calendarSync');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +82,10 @@ app.listen(PORT, () => {
   logger.info(`🚀 Servidor iniciado en puerto ${PORT}`);
   logger.info(`📱 Webhook disponible en: http://localhost:${PORT}/webhook`);
   logger.info(`🏥 Health check: http://localhost:${PORT}/health`);
+
+  // Iniciar job de sincronización calendario-CRM
+  calendarSyncJob.start();
+  logger.info(`🔄 Job de sincronización calendario iniciado (cada 10 min)`);
 });
 
 // Manejo de errores no capturados

@@ -118,12 +118,26 @@ class MessageController {
 
         await this.sendBookingLink(from, memory);
 
-        // Marcar conversación como potencial agendamiento
+        // Marcar conversación como pending (esperando agendamiento)
         await conversationService.completeConversation(
           conversation.id,
-          'pending', // pending hasta que confirmemos que agendó
+          'pending', // pending hasta que job de sync confirme agendamiento
           false
         );
+
+        // Agregar mensaje del sistema para tracking
+        await conversationService.saveMessage(
+          conversation.id,
+          'system',
+          `📅 Link de agendamiento enviado. URL: ${config.googleCalendar.bookingLink}`,
+          null,
+          0
+        );
+
+        logger.info('✅ Link enviado y conversación marcada como pending', {
+          conversationId: conversation.id,
+          phone: from,
+        });
       }
 
       // 9. EXTRACCIÓN AUTOMÁTICA DE DATOS DEL LEAD
