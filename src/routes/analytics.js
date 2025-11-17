@@ -276,8 +276,11 @@ router.get('/prompt-suggestions', async (req, res) => {
  */
 router.get('/funnel', async (req, res) => {
   try {
-    // 1. ETAPA 1: Total de chats únicos (por teléfono)
-    const totalLeads = await prisma.leadData.count();
+    // 1. ETAPA 1: Total de chats únicos (por teléfono) - contar conversations únicas por phone
+    const uniquePhones = await prisma.conversation.groupBy({
+      by: ['phone'],
+    });
+    const totalLeads = uniquePhones.length;
 
     // Obtener todos los leads con sus conversaciones
     const allLeads = await prisma.leadData.findMany({
