@@ -1176,6 +1176,14 @@ class DashboardApp {
                   <option value="cold">Cold (❄️)</option>
                 </select>
               </div>
+              <div class="filter-item">
+                <label>Actividad</label>
+                <select id="modal-filter-response">
+                  <option value="all">Todos</option>
+                  <option value="no-response">🔇 Sin respuesta</option>
+                  <option value="active">💬 Activos</option>
+                </select>
+              </div>
             </div>
             <div style="margin-top: 12px;">
               <button id="btn-apply-filters" class="btn-secondary">🔍 Aplicar Filtros</button>
@@ -1271,12 +1279,14 @@ class DashboardApp {
       const scheduled = document.getElementById('modal-filter-scheduled').value;
       const conversionStatus = document.getElementById('modal-filter-status').value;
       const leadTemperature = document.getElementById('modal-filter-temperature').value;
+      const responseStatus = document.getElementById('modal-filter-response').value;
 
       const filters = {
         hasShopify: hasShopify === 'true' ? true : hasShopify === 'false' ? false : undefined,
         scheduled: scheduled === 'true' ? true : scheduled === 'false' ? false : undefined,
         conversionStatus: conversionStatus !== 'all' ? conversionStatus : undefined,
         leadTemperature: leadTemperature !== 'all' ? leadTemperature : undefined,
+        responseStatus: responseStatus !== 'all' ? responseStatus : undefined,
       };
 
       const response = await fetch('/api/dashboard/preview-recipients', {

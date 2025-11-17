@@ -1000,6 +1000,7 @@ class DashboardController {
         conversionStatus,
         leadTemperature,
         minLeadScore,
+        responseStatus,
       } = req.body;
 
       // Construir filtros para leadData
@@ -1073,6 +1074,36 @@ class DashboardController {
         filteredLeads = filteredLeads.filter(lead => {
           const bestScore = Math.max(...lead.conversations.map(c => c.leadScore), 0);
           return bestScore >= minLeadScore;
+        });
+      }
+
+      // Filtrar por responseStatus (sin respuesta = avatares grises)
+      if (responseStatus === 'no-response') {
+        filteredLeads = filteredLeads.filter(lead => {
+          // MISMA LÓGICA que getAvatarColor() -> 'avatar-default'
+          const hasScheduled = lead.conversations.some(c => c.scheduledMeeting);
+          if (hasScheduled) return false; // Excluir agendados (azul)
+          if (lead.hasShopify) return false; // Excluir con Shopify (verde)
+
+          const bestTemp = lead.conversations.reduce((best, c) => {
+            const tempPriority = { hot: 3, warm: 2, cold: 1 };
+            return (tempPriority[c.leadTemperature] || 0) > (tempPriority[best] || 0)
+              ? c.leadTemperature
+              : best;
+          }, 'cold');
+
+          if (bestTemp === 'hot') return false; // Excluir hot (rojo)
+          if (bestTemp === 'warm') return false; // Excluir warm (naranja)
+
+          // Lo que queda son los "cold" -> avatar gris
+          return true;
+        });
+      } else if (responseStatus === 'active') {
+        // Leads activos: última mensaje es del usuario
+        filteredLeads = filteredLeads.filter(lead => {
+          const latestConv = lead.conversations[0];
+          const lastMsg = latestConv?.messages[0];
+          return lastMsg && lastMsg.role === 'user';
         });
       }
 
