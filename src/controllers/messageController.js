@@ -418,9 +418,29 @@ class MessageController {
         }
       }
 
-      // Detectar Shopify
-      if (allText.includes('shopify')) {
-        leadData.hasShopify = allText.includes('sí') || allText.includes('si') || allText.includes('tengo shopify');
+      // Detectar Shopify (solo si el usuario lo menciona positivamente)
+      // Primero verificar si menciona otras plataformas (debería ser false)
+      const otherPlatforms = [
+        'woocommerce',
+        'woo commerce',
+        'magento',
+        'prestashop',
+        'vtex',
+        'jumpseller',
+        'tienda nube',
+        'mercado shops',
+      ];
+
+      if (otherPlatforms.some(platform => allText.includes(platform))) {
+        leadData.hasShopify = false;
+      } else if (
+        allText.includes('tengo shopify') ||
+        allText.includes('uso shopify') ||
+        allText.includes('mi tienda es shopify') ||
+        allText.includes('con shopify') ||
+        (allText.includes('shopify') && (allText.includes('sí') || allText.includes('si')))
+      ) {
+        leadData.hasShopify = true;
       }
 
       // Detectar inversión en publicidad
