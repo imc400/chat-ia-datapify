@@ -769,6 +769,7 @@ class DashboardController {
           calendarEventCount,
           leadTemperature: bestTemperature,
           leadScore: bestLeadScore,
+          outcome: latestConv?.outcome || null, // ⭐ NUEVO: Outcome de la conversación más reciente
           lastMessage: lastMsg,
           daysSinceLastMessage, // ⭐ NUEVO: Días desde el último mensaje
           conversationCount: lead.conversations.length,
@@ -780,11 +781,26 @@ class DashboardController {
       // Filtrar por responseStatus (después del enriquecimiento)
       let finalLeads = enrichedLeads;
       if (responseStatus === 'no-response') {
-        // Leads sin respuesta: última mensaje es del asistente (bot escribió pero no respondieron)
-        // Excluimos mensajes de sistema
+        // Leads sin respuesta: bot escribió pero no respondieron
+        // CRITERIOS INTELIGENTES:
+        // ✅ Incluir: último mensaje del bot + NO agendaron + conversación pendiente
+        // ❌ Excluir: ya agendaron (no es "nos dejó en visto", cumplió objetivo)
+        // ❌ Excluir: outcome completado (scheduled, converted, not_interested)
         finalLeads = enrichedLeads.filter(lead => {
           const lastMsg = lead.lastMessage;
-          return lastMsg && lastMsg.role === 'assistant';
+
+          // Debe tener último mensaje del asistente
+          if (!lastMsg || lastMsg.role !== 'assistant') return false;
+
+          // EXCLUIR si ya agendó (mensaje de despedida post-agendamiento)
+          if (lead.scheduledMeeting) return false;
+
+          // EXCLUIR si la conversación ya tiene un outcome final
+          // Solo incluir "pending" y "no_answer"
+          const validOutcomes = ['pending', 'no_answer', null, undefined];
+          if (!validOutcomes.includes(lead.outcome)) return false;
+
+          return true;
         });
       } else if (responseStatus === 'active') {
         // Leads activos: última mensaje es del usuario (están conversando activamente)
