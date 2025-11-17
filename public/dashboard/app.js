@@ -596,8 +596,8 @@ class DashboardApp {
       this.loadConversations();
 
       // Si hay conversación seleccionada, recargarla
-      if (this.currentConversation) {
-        this.selectConversation(this.currentConversation.id);
+      if (this.currentConversation && this.currentConversation.phone) {
+        this.selectConversationByPhone(this.currentConversation.phone);
       }
     }, 10000); // 10 segundos
   }
