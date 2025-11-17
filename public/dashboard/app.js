@@ -129,10 +129,13 @@ class DashboardApp {
     }
 
     container.innerHTML = conversations.map(conv => `
-      <div class="conversation-item" data-phone="${conv.phone}">
+      <div class="conversation-item ${conv.unreadCount > 0 ? 'unread' : ''}" data-phone="${conv.phone}">
         <div class="conversation-item-header">
           <span class="conversation-phone">${this.formatPhone(conv.phone)}</span>
-          <span class="conversation-time">${this.formatTime(conv.updatedAt)}</span>
+          <div class="conversation-header-right">
+            ${conv.unreadCount > 0 ? `<span class="unread-badge">${conv.unreadCount}</span>` : ''}
+            <span class="conversation-time">${this.formatTime(conv.updatedAt)}</span>
+          </div>
         </div>
         <div class="conversation-preview">
           ${conv.lastMessage ? this.truncate(conv.lastMessage.content, 60) : 'Sin mensajes'}
@@ -206,7 +209,18 @@ class DashboardApp {
       document.querySelectorAll('.conversation-item').forEach(item => {
         item.classList.remove('active');
       });
-      document.querySelector(`[data-phone="${phone}"]`).classList.add('active');
+      const conversationItem = document.querySelector(`[data-phone="${phone}"]`);
+      conversationItem.classList.add('active');
+
+      // Marcar como leída (automáticamente)
+      await this.markConversationAsRead(phone);
+
+      // Remover badge de no leídos visualmente
+      conversationItem.classList.remove('unread');
+      const unreadBadge = conversationItem.querySelector('.unread-badge');
+      if (unreadBadge) {
+        unreadBadge.remove();
+      }
 
       // Cargar historial completo del teléfono
       const response = await fetch(`/api/dashboard/phone/${phone}`);
@@ -557,6 +571,20 @@ class DashboardApp {
       toggle.classList.toggle('active');
       content.classList.toggle('active');
     });
+  }
+
+  /**
+   * Marcar conversación como leída
+   */
+  async markConversationAsRead(phone) {
+    try {
+      await fetch(`/api/dashboard/phone/${encodeURIComponent(phone)}/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error('Error marcando conversación como leída:', error);
+    }
   }
 
   /**

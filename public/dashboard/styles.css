@@ -339,11 +339,28 @@ body {
   border-left: 3px solid var(--primary-color);
 }
 
+/* WhatsApp-style unread indicator */
+.conversation-item.unread {
+  background: #f0f9ff;
+  font-weight: 600;
+}
+
+.conversation-item.unread .conversation-preview {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .conversation-item-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.conversation-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .conversation-phone {
@@ -355,6 +372,22 @@ body {
 .conversation-time {
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+/* Badge de mensajes no leídos (estilo WhatsApp) */
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #25d366;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  line-height: 1;
 }
 
 .conversation-preview {
