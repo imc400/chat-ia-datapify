@@ -489,13 +489,19 @@ class DashboardController {
         totalConversations,
         activeConversations,
         scheduledMeetings,
+        pendingMeetings,
+        disqualified,
+        abandoned,
         hotLeads,
         warmLeads,
         coldLeads,
       ] = await Promise.all([
         prisma.conversation.count(),
         prisma.conversation.count({ where: { status: 'active' } }),
-        prisma.conversation.count({ where: { scheduledMeeting: true } }),
+        prisma.conversation.count({ where: { outcome: 'scheduled' } }),
+        prisma.conversation.count({ where: { outcome: 'pending' } }),
+        prisma.conversation.count({ where: { outcome: 'disqualified' } }),
+        prisma.conversation.count({ where: { outcome: 'abandoned' } }),
         prisma.conversation.count({ where: { leadTemperature: 'hot' } }),
         prisma.conversation.count({ where: { leadTemperature: 'warm' } }),
         prisma.conversation.count({ where: { leadTemperature: 'cold' } }),
@@ -507,7 +513,7 @@ class DashboardController {
 
       const recentConversions = await prisma.conversation.count({
         where: {
-          scheduledMeeting: true,
+          outcome: 'scheduled',
           createdAt: { gte: sevenDaysAgo },
         },
       });
@@ -522,6 +528,15 @@ class DashboardController {
         ? ((recentConversions / recentTotal) * 100).toFixed(1)
         : 0;
 
+      // ⭐ NUEVO: Funnel de conversión completo
+      const linksSent = pendingMeetings + scheduledMeetings; // Links enviados = pending + scheduled
+      const funnelConversionRate = linksSent > 0
+        ? ((scheduledMeetings / linksSent) * 100).toFixed(1)
+        : 0;
+      const overallConversionRate = totalConversations > 0
+        ? ((scheduledMeetings / totalConversations) * 100).toFixed(1)
+        : 0;
+
       res.json(serializeBigInt({ success: true, data: {
           total: totalConversations,
           active: activeConversations,
@@ -530,6 +545,18 @@ class DashboardController {
             hot: hotLeads,
             warm: warmLeads,
             cold: coldLeads,
+          },
+          // ⭐ NUEVO: Funnel completo de conversión
+          funnel: {
+            conversationsStarted: totalConversations,
+            linksSent: linksSent, // pending + scheduled
+            scheduled: scheduledMeetings,
+            disqualified: disqualified,
+            abandoned: abandoned,
+            pending: pendingMeetings, // Links enviados esperando confirmación
+            // Tasas de conversión
+            linkConversionRate: parseFloat(funnelConversionRate), // De links a agendados
+            overallConversionRate: parseFloat(overallConversionRate), // De conversaciones a agendados
           },
           last7Days: {
             conversations: recentTotal,
