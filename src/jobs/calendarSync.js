@@ -44,6 +44,7 @@ class CalendarSyncJob {
 
   /**
    * Ejecuta la sincronización
+   * OPTIMIZACIÓN: El calendarService ahora usa cache, así que este job es mucho más liviano
    */
   async sync() {
     if (this.isRunning) {
@@ -86,6 +87,8 @@ class CalendarSyncJob {
       let errorCount = 0;
 
       // 2. Verificar cada conversación en Google Calendar
+      // OPTIMIZACIÓN: El calendarService usa cache, así que todas estas llamadas
+      // comparten la misma lista de eventos (1 sola llamada a Calendar API)
       for (const conversation of pendingConversations) {
         try {
           // Verificar si tiene evento en Google Calendar

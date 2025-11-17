@@ -402,16 +402,81 @@ class CalendarService {
   }
 
   /**
+   * Cache para eventos de calendario (evita múltiples llamadas en el mismo ciclo)
+   * TTL: 10 minutos
+   */
+  eventsCache = {
+    data: null,
+    timestamp: null,
+    ttl: 10 * 60 * 1000, // 10 minutos
+  };
+
+  /**
+   * Obtener TODOS los eventos futuros (con caché de 10 minutos)
+   * OPTIMIZACIÓN: Hace 1 sola llamada a la API en lugar de N llamadas
+   */
+  async getAllFutureEvents() {
+    try {
+      const now = Date.now();
+
+      // Si el cache es válido, retornar datos cacheados
+      if (this.eventsCache.data && this.eventsCache.timestamp && (now - this.eventsCache.timestamp) < this.eventsCache.ttl) {
+        logger.info('🔄 Usando eventos cacheados', {
+          cacheAge: Math.round((now - this.eventsCache.timestamp) / 1000) + 's',
+          eventCount: this.eventsCache.data.length,
+        });
+        return this.eventsCache.data;
+      }
+
+      // Cache expiró, buscar todos los eventos
+      const momentNow = moment.tz(this.timezone);
+      const futureLimit = momentNow.clone().add(60, 'days');
+
+      logger.info('📅 Obteniendo TODOS los eventos futuros (próximos 60 días)...');
+
+      const response = await this.calendar.events.list({
+        calendarId: config.googleCalendar.calendarId,
+        timeMin: momentNow.toISOString(),
+        timeMax: futureLimit.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: 2500, // Google Calendar API permite max 2500
+      });
+
+      const events = response.data.items || [];
+
+      // Actualizar cache
+      this.eventsCache.data = events;
+      this.eventsCache.timestamp = now;
+
+      logger.info('✅ Eventos obtenidos y cacheados', {
+        eventCount: events.length,
+        cacheTTL: this.eventsCache.ttl / 1000 + 's',
+      });
+
+      return events;
+    } catch (error) {
+      logger.error('❌ Error obteniendo eventos de calendario:', error.message);
+
+      // Si hay error pero tenemos cache, retornar cache aunque esté expirado
+      if (this.eventsCache.data) {
+        logger.warn('⚠️ Usando cache expirado por error de API');
+        return this.eventsCache.data;
+      }
+
+      return [];
+    }
+  }
+
+  /**
    * Verificar si un teléfono tiene eventos agendados en Google Calendar
    * Busca eventos futuros que contengan el teléfono en la descripción
    * AHORA extrae y valida los datos del formulario de cada evento
    * MEJORA: Normaliza números para buscar todas las variantes
+   * OPTIMIZACIÓN CRÍTICA: Usa cache de eventos en lugar de 6 búsquedas por teléfono
    */
   async checkPhoneHasScheduledEvents(phone) {
     try {
-      const now = moment.tz(this.timezone);
-      const futureLimit = now.clone().add(60, 'days'); // Buscar eventos en los próximos 60 días
-
       // Normalizar el teléfono de búsqueda
       const normalizedSearchPhone = this.normalizePhone(phone);
 
@@ -420,7 +485,7 @@ class CalendarService {
         ? normalizedSearchPhone.slice(2)
         : normalizedSearchPhone;
 
-      // Generar variantes del número para buscar
+      // Generar variantes del número para comparación local
       const phoneVariants = [
         phone,                          // Original
         normalizedSearchPhone,          // 56977788379
@@ -430,62 +495,24 @@ class CalendarService {
         `0${localPhone}`,               // 0977788379 (local con cero)
       ];
 
-      logger.info('🔍 Buscando eventos en calendario', {
+      logger.info('🔍 Buscando eventos para teléfono', {
         originalPhone: phone,
         normalizedPhone: normalizedSearchPhone,
-        searchVariants: phoneVariants,
       });
 
-      // Buscar con todas las variantes
-      let allEvents = [];
-      for (const variant of phoneVariants) {
-        try {
-          const response = await this.calendar.events.list({
-            calendarId: config.googleCalendar.calendarId,
-            timeMin: now.toISOString(),
-            timeMax: futureLimit.toISOString(),
-            q: variant,
-            singleEvents: true,
-            orderBy: 'startTime',
-          });
+      // OPTIMIZACIÓN: Obtener TODOS los eventos (con cache) en lugar de buscar 6 veces
+      const allEvents = await this.getAllFutureEvents();
 
-          if (response.data.items && response.data.items.length > 0) {
-            allEvents.push(...response.data.items);
-          }
-        } catch (searchError) {
-          logger.warn(`Error buscando con variante ${variant}:`, searchError.message);
-        }
+      if (!allEvents || allEvents.length === 0) {
+        logger.info('❌ No hay eventos futuros en el calendario');
+        return {
+          hasScheduled: false,
+          eventCount: 0,
+        };
       }
 
-      // Eliminar duplicados por ID
-      const uniqueEvents = Array.from(
-        new Map(allEvents.map(event => [event.id, event])).values()
-      );
-
-      // SI NO SE ENCONTRARON EVENTOS con búsqueda, hacer búsqueda amplia (fallback)
-      if (uniqueEvents.length === 0) {
-        logger.info('⚠️ No se encontraron eventos con búsqueda específica, buscando todos los eventos...');
-
-        try {
-          const allEventsResponse = await this.calendar.events.list({
-            calendarId: config.googleCalendar.calendarId,
-            timeMin: now.toISOString(),
-            timeMax: futureLimit.toISOString(),
-            singleEvents: true,
-            orderBy: 'startTime',
-            maxResults: 100
-          });
-
-          if (allEventsResponse.data.items) {
-            allEvents = allEventsResponse.data.items;
-          }
-        } catch (fallbackError) {
-          logger.warn('Error en búsqueda amplia de eventos:', fallbackError.message);
-        }
-      }
-
-      // Filtrar y enriquecer eventos que realmente contengan el teléfono
-      const matchingEvents = (uniqueEvents.length > 0 ? uniqueEvents : allEvents)
+      // Filtrar y enriquecer eventos que contengan alguna variante del teléfono
+      const matchingEvents = allEvents
         .map(event => {
           const formData = this.extractEventFormData(event);
 
@@ -496,12 +523,18 @@ class CalendarService {
           const searchLast9 = normalizedSearchPhone.slice(-9);
           const eventLast9 = eventPhone.slice(-9);
 
-          // Verificar si el teléfono coincide (comparar últimos 9 dígitos)
+          // Verificar si el teléfono coincide con alguna variante
           const phoneMatches =
             eventPhone === normalizedSearchPhone ||
             eventPhone.includes(normalizedSearchPhone) ||
             normalizedSearchPhone.includes(eventPhone) ||
-            (searchLast9.length === 9 && eventLast9.length === 9 && searchLast9 === eventLast9);
+            (searchLast9.length === 9 && eventLast9.length === 9 && searchLast9 === eventLast9) ||
+            // También verificar si la descripción contiene alguna variante
+            phoneVariants.some(variant => {
+              const desc = (event.description || '').toLowerCase();
+              const summary = (event.summary || '').toLowerCase();
+              return desc.includes(variant.toLowerCase()) || summary.includes(variant.toLowerCase());
+            });
 
           return {
             ...event,
@@ -539,8 +572,7 @@ class CalendarService {
       logger.info('❌ No se encontraron eventos para el teléfono', {
         phone,
         normalizedPhone: normalizedSearchPhone,
-        searchedVariants: phoneVariants,
-        totalEventsFound: uniqueEvents.length,
+        totalEventsChecked: allEvents.length,
       });
 
       return {
