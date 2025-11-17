@@ -942,9 +942,17 @@ class DashboardController {
       // Construir filtros para leadData
       const leadWhere = {};
 
+      // Filtro de Shopify: manejar true, false, y undefined (todos)
       if (hasShopify === true) {
         leadWhere.hasShopify = true;
+      } else if (hasShopify === false) {
+        // CRÍTICO: Filtrar explícitamente por false O null
+        leadWhere.OR = [
+          { hasShopify: false },
+          { hasShopify: null },
+        ];
       }
+      // Si hasShopify === undefined, no agregar filtro (mostrar todos)
 
       if (conversionStatus && conversionStatus !== 'all') {
         if (conversionStatus === 'none') {
