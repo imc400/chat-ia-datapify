@@ -324,14 +324,18 @@ body {
 }
 
 .conversation-item {
-  padding: 16px 20px;
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
+  position: relative;
 }
 
 .conversation-item:hover {
   background: var(--bg-secondary);
+  transform: translateX(2px);
 }
 
 .conversation-item.active {
@@ -339,10 +343,19 @@ body {
   border-left: 3px solid var(--primary-color);
 }
 
+.conversation-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--primary-color);
+}
+
 /* WhatsApp-style unread indicator */
 .conversation-item.unread {
   background: #f0f9ff;
-  font-weight: 600;
 }
 
 .conversation-item.unread .conversation-preview {
@@ -350,17 +363,85 @@ body {
   font-weight: 500;
 }
 
+.conversation-item.unread .conversation-name {
+  font-weight: 700;
+}
+
+/* AVATARES DE CONVERSACIÓN */
+.conversation-avatar {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: white;
+  text-transform: uppercase;
+  transition: transform 0.2s ease;
+}
+
+.conversation-item:hover .conversation-avatar {
+  transform: scale(1.05);
+}
+
+/* Colores de avatar según estado */
+.avatar-scheduled {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.avatar-shopify {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.avatar-hot {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.avatar-warm {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.avatar-default {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2);
+}
+
+/* CONTENIDO DE LA CONVERSACIÓN */
+.conversation-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .conversation-item-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+}
+
+.conversation-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .conversation-header-right {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .conversation-phone {
@@ -396,7 +477,25 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* Indicadores de quién envió el mensaje */
+.preview-sender {
+  font-weight: 600;
+  color: #6366f1;
+  margin-right: 4px;
+}
+
+.preview-sender-user {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+.no-messages {
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 .conversation-meta {

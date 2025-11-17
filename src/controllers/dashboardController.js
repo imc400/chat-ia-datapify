@@ -115,9 +115,14 @@ class DashboardController {
         group.unreadCount = unreadCount;
       }
 
-      // Convertir a array y ordenar por última actividad (como WhatsApp)
+      // Convertir a array y ordenar por timestamp del último mensaje (no por updatedAt)
+      // Esto evita que los chats se reordenen al marcarlos como leídos
       const grouped = Object.values(groupedByPhone)
-        .sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
+        .sort((a, b) => {
+          const aTime = a.lastMessage?.timestamp || a.lastUpdate;
+          const bTime = b.lastMessage?.timestamp || b.lastUpdate;
+          return new Date(bTime) - new Date(aTime);
+        });
 
       // Aplicar paginación
       const paginated = grouped.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
@@ -885,6 +890,7 @@ class DashboardController {
   /**
    * Marcar conversación como leída
    * Actualiza lastReadAt para todas las conversaciones de un teléfono
+   * IMPORTANTE: Usa raw query para NO actualizar updatedAt automáticamente
    */
   async markAsRead(req, res) {
     try {
@@ -897,21 +903,23 @@ class DashboardController {
         });
       }
 
-      // Actualizar lastReadAt para todas las conversaciones de este teléfono
-      const updated = await prisma.conversation.updateMany({
-        where: { phone },
-        data: { lastReadAt: new Date() },
-      });
+      // Usar $executeRaw para actualizar SOLO lastReadAt sin tocar updatedAt
+      // Esto evita que los chats se reordenen al hacer click
+      const updated = await prisma.$executeRaw`
+        UPDATE "Conversation"
+        SET "lastReadAt" = ${new Date()}
+        WHERE phone = ${phone}
+      `;
 
       logger.info(`📖 Conversaciones marcadas como leídas para ${phone}`, {
-        count: updated.count,
+        count: updated,
       });
 
       res.json({
         success: true,
         data: {
           phone,
-          conversationsUpdated: updated.count,
+          conversationsUpdated: updated,
           markedAt: new Date(),
         },
       });

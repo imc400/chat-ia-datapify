@@ -145,20 +145,25 @@ class DashboardApp {
 
     container.innerHTML = conversations.map(conv => `
       <div class="conversation-item ${conv.unreadCount > 0 ? 'unread' : ''}" data-phone="${conv.phone}">
-        <div class="conversation-item-header">
-          <span class="conversation-phone">${this.formatPhone(conv.phone)}</span>
-          <div class="conversation-header-right">
-            ${conv.unreadCount > 0 ? `<span class="unread-badge">${conv.unreadCount}</span>` : ''}
-            <span class="conversation-time">${this.formatTime(conv.updatedAt)}</span>
+        <div class="conversation-avatar ${this.getAvatarColor(conv)}">
+          ${this.getAvatarInitials(conv)}
+        </div>
+        <div class="conversation-content">
+          <div class="conversation-item-header">
+            <span class="conversation-name">${conv.leadData?.name || this.formatPhone(conv.phone)}</span>
+            <div class="conversation-header-right">
+              ${conv.unreadCount > 0 ? `<span class="unread-badge">${conv.unreadCount}</span>` : ''}
+              <span class="conversation-time">${this.formatTime(conv.lastMessage?.timestamp || conv.updatedAt)}</span>
+            </div>
           </div>
-        </div>
-        <div class="conversation-preview">
-          ${conv.lastMessage ? this.truncate(conv.lastMessage.content, 60) : 'Sin mensajes'}
-        </div>
-        <div class="conversation-meta">
-          ${conv.leadData?.hasShopify ? '<span class="lead-badge shopify">🛍️ Shopify</span>' : ''}
-          ${conv.scheduledMeeting ? `<span class="meeting-badge">📅 Agendado${conv.calendarEventCount > 1 ? ` (${conv.calendarEventCount})` : ''}</span>` : ''}
-          ${conv.conversationCount > 1 ? `<span class="conversation-count-badge">${conv.conversationCount} conversaciones</span>` : ''}
+          <div class="conversation-preview">
+            ${this.renderMessagePreview(conv.lastMessage)}
+          </div>
+          <div class="conversation-meta">
+            ${conv.leadData?.hasShopify ? '<span class="lead-badge shopify">🛍️ Shopify</span>' : ''}
+            ${conv.scheduledMeeting ? `<span class="meeting-badge">📅 Agendado${conv.calendarEventCount > 1 ? ` (${conv.calendarEventCount})` : ''}</span>` : ''}
+            ${conv.conversationCount > 1 ? `<span class="conversation-count-badge">${conv.conversationCount} conversaciones</span>` : ''}
+          </div>
         </div>
       </div>
     `).join('');
@@ -691,6 +696,49 @@ class DashboardApp {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  /**
+   * Renderizar preview del último mensaje con indicador de quién lo envió
+   */
+  renderMessagePreview(lastMessage) {
+    if (!lastMessage) {
+      return '<span class="no-messages">Sin mensajes</span>';
+    }
+
+    const isBot = lastMessage.role === 'assistant';
+    const prefix = isBot
+      ? '<span class="preview-sender">Agente:</span>'
+      : '<span class="preview-sender-user">Tú:</span>';
+    const truncated = this.truncate(lastMessage.content, 50);
+
+    return `${prefix} ${this.escapeHtml(truncated)}`;
+  }
+
+  /**
+   * Obtener iniciales para el avatar del lead
+   */
+  getAvatarInitials(conv) {
+    if (conv.leadData?.name) {
+      const names = conv.leadData.name.split(' ');
+      if (names.length >= 2) {
+        return (names[0][0] + names[1][0]).toUpperCase();
+      }
+      return names[0].substring(0, 2).toUpperCase();
+    }
+    // Si no hay nombre, usar últimos 2 dígitos del teléfono
+    return conv.phone.slice(-2);
+  }
+
+  /**
+   * Obtener color del avatar según estado del lead
+   */
+  getAvatarColor(conv) {
+    if (conv.scheduledMeeting) return 'avatar-scheduled'; // Azul para agendados
+    if (conv.leadData?.hasShopify) return 'avatar-shopify'; // Verde para Shopify
+    if (conv.leadTemperature === 'hot') return 'avatar-hot'; // Rojo para hot leads
+    if (conv.leadTemperature === 'warm') return 'avatar-warm'; // Naranja para warm
+    return 'avatar-default'; // Gris por defecto
   }
 
   showError(message) {
