@@ -507,6 +507,12 @@ class DashboardController {
         prisma.conversation.count({ where: { leadTemperature: 'cold' } }),
       ]);
 
+      // ⭐ NUEVO: Contar leads únicos (teléfonos únicos)
+      const uniquePhones = await prisma.conversation.groupBy({
+        by: ['phone'],
+      });
+      const uniqueLeads = uniquePhones.length;
+
       // Conversiones últimos 7 días
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -536,6 +542,9 @@ class DashboardController {
       const overallConversionRate = totalConversations > 0
         ? ((scheduledMeetings / totalConversations) * 100).toFixed(1)
         : 0;
+      const leadConversionRate = uniqueLeads > 0
+        ? ((scheduledMeetings / uniqueLeads) * 100).toFixed(1)
+        : 0;
 
       res.json(serializeBigInt({ success: true, data: {
           total: totalConversations,
@@ -548,14 +557,21 @@ class DashboardController {
           },
           // ⭐ NUEVO: Funnel completo de conversión
           funnel: {
+            // 1. Chats/Leads únicos (teléfonos únicos)
+            uniqueLeads: uniqueLeads,
+            // 2. Conversaciones totales iniciadas
             conversationsStarted: totalConversations,
+            // 3. Links de agendamiento enviados
             linksSent: linksSent, // pending + scheduled
+            // 4. Agendamientos confirmados
             scheduled: scheduledMeetings,
+            // 5. Descalificados y abandonados
             disqualified: disqualified,
             abandoned: abandoned,
             pending: pendingMeetings, // Links enviados esperando confirmación
-            // Tasas de conversión
+            // Tasas de conversión en cada etapa
             linkConversionRate: parseFloat(funnelConversionRate), // De links a agendados
+            leadConversionRate: parseFloat(leadConversionRate), // De leads únicos a agendados
             overallConversionRate: parseFloat(overallConversionRate), // De conversaciones a agendados
           },
           last7Days: {
