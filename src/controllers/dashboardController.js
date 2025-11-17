@@ -781,25 +781,23 @@ class DashboardController {
       // Filtrar por responseStatus (después del enriquecimiento)
       let finalLeads = enrichedLeads;
       if (responseStatus === 'no-response') {
-        // Leads sin respuesta: bot escribió pero no respondieron
-        // CRITERIOS INTELIGENTES:
-        // ✅ Incluir: último mensaje del bot + NO agendaron + conversación pendiente
-        // ❌ Excluir: ya agendaron (no es "nos dejó en visto", cumplió objetivo)
-        // ❌ Excluir: outcome completado (scheduled, converted, not_interested)
+        // Leads sin respuesta: MISMA LÓGICA que los avatares grises
+        // Son los leads "cold" que no mostraron interés o no respondieron
+        // ⭐ CRITERIO: Coincide exactamente con getAvatarColor() -> 'avatar-default'
         finalLeads = enrichedLeads.filter(lead => {
-          const lastMsg = lead.lastMessage;
-
-          // Debe tener último mensaje del asistente
-          if (!lastMsg || lastMsg.role !== 'assistant') return false;
-
-          // EXCLUIR si ya agendó (mensaje de despedida post-agendamiento)
+          // Excluir si agendó (azul)
           if (lead.scheduledMeeting) return false;
 
-          // EXCLUIR si la conversación ya tiene un outcome final
-          // Solo incluir "pending" y "no_answer"
-          const validOutcomes = ['pending', 'no_answer', null, undefined];
-          if (!validOutcomes.includes(lead.outcome)) return false;
+          // Excluir si tiene Shopify (verde)
+          if (lead.hasShopify) return false;
 
+          // Excluir si es hot lead (rojo)
+          if (lead.leadTemperature === 'hot') return false;
+
+          // Excluir si es warm lead (naranja)
+          if (lead.leadTemperature === 'warm') return false;
+
+          // Lo que queda son los "cold" o sin temperatura -> avatar gris
           return true;
         });
       } else if (responseStatus === 'active') {
