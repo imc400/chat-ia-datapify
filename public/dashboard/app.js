@@ -1154,7 +1154,7 @@ class DashboardApp {
                 <label>Agendamiento</label>
                 <select id="modal-filter-scheduled">
                   <option value="">Todos</option>
-                  <option value="false" selected>No agendaron</option>
+                  <option value="false">No agendaron</option>
                   <option value="true">Sí agendaron</option>
                 </select>
               </div>
@@ -1162,7 +1162,7 @@ class DashboardApp {
                 <label>Estado de conversión</label>
                 <select id="modal-filter-status">
                   <option value="all">Todos</option>
-                  <option value="none" selected>Sin conversión</option>
+                  <option value="not_started">Sin conversión</option>
                   <option value="trial_14_days">Trial 14 días</option>
                   <option value="paid_monthly_bonus">Pagando</option>
                 </select>
