@@ -1067,10 +1067,11 @@ class DashboardController {
   /**
    * NUEVO: Enviar mensaje a uno o varios leads desde el dashboard
    * Guarda el mensaje en BD para que la IA tenga contexto cuando respondan
+   * AHORA CON TRACKING DE CAMPAÑAS
    */
   async sendMessage(req, res) {
     try {
-      const { phones, message, source = 'manual_dashboard' } = req.body;
+      const { phones, message, source = 'manual_dashboard', campaignName, filters } = req.body;
 
       // Validaciones
       if (!phones || !Array.isArray(phones) || phones.length === 0) {
@@ -1098,6 +1099,40 @@ class DashboardController {
         recipientCount: phones.length,
         messageLength: message.length,
         source,
+        campaignName: campaignName || 'Sin nombre',
+      });
+
+      // PASO 1: Crear campaña en la base de datos
+      const campaign = await prisma.campaign.create({
+        data: {
+          name: campaignName || `Campaña ${new Date().toLocaleString('es-CL')}`,
+          message: message,
+          filters: filters || null,
+          totalRecipients: phones.length,
+          status: 'sending',
+        },
+      });
+
+      logger.info('📋 Campaña creada', {
+        campaignId: campaign.id,
+        name: campaign.name,
+      });
+
+      // PASO 2: Obtener datos de los leads para los recipients
+      const leadsData = await prisma.leadData.findMany({
+        where: {
+          phone: { in: phones },
+        },
+        select: {
+          phone: true,
+          name: true,
+        },
+      });
+
+      // Crear map de phone -> name
+      const phoneToNameMap = {};
+      leadsData.forEach(lead => {
+        phoneToNameMap[lead.phone] = lead.name;
       });
 
       const results = {
@@ -1110,13 +1145,15 @@ class DashboardController {
       const whatsappService = require('../services/whatsappService');
       const conversationService = require('../services/conversationService');
 
-      // Enviar mensajes con rate limiting (1 mensaje por segundo para no saturar WhatsApp API)
+      // PASO 3: Enviar mensajes con rate limiting (1 mensaje por segundo para no saturar WhatsApp API)
       for (let i = 0; i < phones.length; i++) {
         const phone = phones[i];
+        const leadName = phoneToNameMap[phone] || null;
 
         try {
           // 1. Enviar mensaje por WhatsApp
-          await whatsappService.sendTextMessage(phone, message);
+          const whatsappResponse = await whatsappService.sendTextMessage(phone, message);
+          const messageId = whatsappResponse?.messages?.[0]?.id || null;
 
           // 2. Obtener o crear conversación para este teléfono
           const conversation = await conversationService.getOrCreateConversation(phone);
@@ -1134,10 +1171,22 @@ class DashboardController {
           await conversationService.saveMessage(
             conversation.id,
             'system',
-            `📤 Mensaje manual enviado desde dashboard (${source})`,
+            `📤 Mensaje manual enviado desde dashboard - Campaña: ${campaign.name}`,
             null,
             0
           );
+
+          // 5. Crear recipient en la campaña
+          await prisma.campaignRecipient.create({
+            data: {
+              campaignId: campaign.id,
+              phone: phone,
+              leadName: leadName,
+              status: 'sent',
+              sentAt: new Date(),
+              messageId: messageId,
+            },
+          });
 
           results.sent.push({
             phone,
@@ -1155,6 +1204,17 @@ class DashboardController {
         } catch (error) {
           logger.error('❌ Error enviando mensaje', { phone, error: error.message });
 
+          // Crear recipient con estado failed
+          await prisma.campaignRecipient.create({
+            data: {
+              campaignId: campaign.id,
+              phone: phone,
+              leadName: leadName,
+              status: 'failed',
+              errorMessage: error.message,
+            },
+          });
+
           results.failed.push({
             phone,
             status: 'failed',
@@ -1164,8 +1224,21 @@ class DashboardController {
         }
       }
 
+      // PASO 4: Actualizar estadísticas de la campaña
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: {
+          sentCount: results.sent.length,
+          failedCount: results.failed.length,
+          status: 'completed',
+          completedAt: new Date(),
+        },
+      });
+
       // Log final
       logger.info('📊 Envío masivo completado', {
+        campaignId: campaign.id,
+        campaignName: campaign.name,
         total: results.total,
         sent: results.sent.length,
         failed: results.failed.length,
@@ -1176,6 +1249,8 @@ class DashboardController {
         success: true,
         data: {
           message: `Envío completado: ${results.sent.length} exitosos, ${results.failed.length} fallidos`,
+          campaignId: campaign.id,
+          campaignName: campaign.name,
           results,
           summary: {
             total: results.total,
@@ -1191,6 +1266,108 @@ class DashboardController {
       res.status(500).json({
         success: false,
         error: 'Error enviando mensajes',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * NUEVO: Obtener lista de campañas con estadísticas
+   */
+  async getCampaigns(req, res) {
+    try {
+      const { limit = 50, offset = 0 } = req.query;
+
+      const campaigns = await prisma.campaign.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit),
+        skip: parseInt(offset),
+        select: {
+          id: true,
+          name: true,
+          message: true,
+          filters: true,
+          totalRecipients: true,
+          sentCount: true,
+          failedCount: true,
+          deliveredCount: true,
+          readCount: true,
+          repliedCount: true,
+          status: true,
+          createdAt: true,
+          completedAt: true,
+        },
+      });
+
+      const total = await prisma.campaign.count();
+
+      logger.info('📋 Campañas obtenidas', {
+        count: campaigns.length,
+        total,
+      });
+
+      res.json(serializeBigInt({
+        success: true,
+        data: {
+          campaigns,
+          pagination: {
+            total,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            hasMore: (parseInt(offset) + campaigns.length) < total,
+          },
+        },
+      }));
+
+    } catch (error) {
+      logger.error('Error obteniendo campañas:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error obteniendo campañas',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * NUEVO: Obtener detalle completo de una campaña con sus recipients
+   */
+  async getCampaignDetail(req, res) {
+    try {
+      const { id } = req.params;
+
+      const campaign = await prisma.campaign.findUnique({
+        where: { id },
+        include: {
+          recipients: {
+            orderBy: { sentAt: 'desc' },
+          },
+        },
+      });
+
+      if (!campaign) {
+        return res.status(404).json({
+          success: false,
+          error: 'Campaña no encontrada',
+        });
+      }
+
+      logger.info('📊 Detalle de campaña obtenido', {
+        campaignId: id,
+        name: campaign.name,
+        recipientCount: campaign.recipients.length,
+      });
+
+      res.json(serializeBigInt({
+        success: true,
+        data: campaign,
+      }));
+
+    } catch (error) {
+      logger.error('Error obteniendo detalle de campaña:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error obteniendo detalle de campaña',
         details: error.message,
       });
     }

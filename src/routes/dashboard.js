@@ -40,4 +40,11 @@ router.post('/send-message', dashboardController.sendMessage);
 // POST /api/dashboard/preview-recipients - Preview de destinatarios según filtros
 router.post('/preview-recipients', dashboardController.previewRecipients);
 
+// NUEVO: Gestión de Campañas
+// GET /api/dashboard/campaigns - Obtener lista de campañas
+router.get('/campaigns', dashboardController.getCampaigns);
+
+// GET /api/dashboard/campaigns/:id - Obtener detalle de una campaña
+router.get('/campaigns/:id', dashboardController.getCampaignDetail);
+
 module.exports = router;

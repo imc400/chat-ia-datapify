@@ -174,3 +174,61 @@ model PromptVersion {
   @@index([activeFrom])
   @@index([conversionRate])
 }
+
+// ========================================
+// CAMPAÑAS DE MENSAJES MASIVOS
+// ========================================
+
+model Campaign {
+  id                String   @id @default(uuid())
+  name              String   // Nombre de la campaña (ej: "Follow-up Shopify Nov 2024")
+  message           String   @db.Text // Mensaje enviado
+
+  // Filtros aplicados
+  filters           Json?    // Filtros usados { hasShopify, hasScheduled, conversionStatus, leadTemperature }
+
+  // Estadísticas
+  totalRecipients   Int      @default(0) // Total de destinatarios seleccionados
+  sentCount         Int      @default(0) // Enviados con éxito
+  failedCount       Int      @default(0) // Fallos al enviar
+  deliveredCount    Int      @default(0) // Entregados (webhook confirmation)
+  readCount         Int      @default(0) // Leídos (webhook read receipt)
+  repliedCount      Int      @default(0) // Respondieron al mensaje
+
+  // Metadata
+  status            String   @default("sending") // 'sending', 'completed', 'failed'
+  createdBy         String?  // Usuario que creó la campaña (futuro)
+  createdAt         DateTime @default(now())
+  completedAt       DateTime?
+
+  // Relaciones
+  recipients        CampaignRecipient[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model CampaignRecipient {
+  id              String   @id @default(uuid())
+  campaignId      String
+  phone           String   // Teléfono del destinatario
+  leadName        String?  // Nombre del lead (para display)
+
+  // Estado del envío
+  status          String   @default("pending") // 'pending', 'sent', 'failed', 'delivered', 'read', 'replied'
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  repliedAt       DateTime?
+
+  // Tracking
+  messageId       String?  // ID del mensaje de WhatsApp
+  errorMessage    String?  @db.Text // Error si falló
+
+  // Relaciones
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([phone])
+  @@index([status])
+}

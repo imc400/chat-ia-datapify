@@ -1034,14 +1034,29 @@ class DashboardApp {
         <div class="mass-message-modal-body">
           <div id="message-status"></div>
 
+          <!-- Nombre de campaña -->
+          <div class="form-group">
+            <label for="campaign-name">Nombre de la Campaña *</label>
+            <input
+              type="text"
+              id="campaign-name"
+              class="form-input"
+              placeholder="Ej: Follow-up Shopify Noviembre 2024"
+              maxlength="100"
+              required
+            />
+            <small>Dale un nombre descriptivo para identificar esta campaña</small>
+          </div>
+
           <!-- Formulario de mensaje -->
           <div class="form-group">
-            <label for="mass-message-text">Mensaje</label>
+            <label for="mass-message-text">Mensaje *</label>
             <textarea
               id="mass-message-text"
               class="form-textarea"
               placeholder="Escribe tu mensaje aquí..."
               maxlength="1000"
+              required
             ></textarea>
             <div class="char-counter" id="char-counter">0 / 1000 caracteres</div>
             <small>El mensaje se enviará exactamente como lo escribas, con saltos de línea incluidos.</small>
@@ -1127,6 +1142,12 @@ class DashboardApp {
     modal.querySelector('#btn-cancel').addEventListener('click', () => this.closeMassMessageModal());
     modal.addEventListener('click', (e) => {
       if (e.target === modal) this.closeMassMessageModal();
+    });
+
+    // Event listener para campo de nombre de campaña
+    const campaignNameInput = modal.querySelector('#campaign-name');
+    campaignNameInput.addEventListener('input', () => {
+      this.updateSendButtonState();
     });
 
     // Contador de caracteres
@@ -1245,6 +1266,7 @@ class DashboardApp {
   }
 
   updateSendButtonState() {
+    const campaignName = document.getElementById('campaign-name')?.value || '';
     const message = document.getElementById('mass-message-text')?.value || '';
     const checkedBoxes = document.querySelectorAll('.recipient-checkbox:checked');
     const sendBtn = document.getElementById('btn-send');
@@ -1252,7 +1274,7 @@ class DashboardApp {
 
     if (!sendBtn) return;
 
-    const canSend = message.trim().length > 0 && checkedBoxes.length > 0;
+    const canSend = campaignName.trim().length > 0 && message.trim().length > 0 && checkedBoxes.length > 0;
     sendBtn.disabled = !canSend;
 
     // Actualizar contador
@@ -1263,18 +1285,34 @@ class DashboardApp {
   }
 
   async sendMassMessage() {
+    const campaignName = document.getElementById('campaign-name').value.trim();
     const message = document.getElementById('mass-message-text').value.trim();
     const checkedBoxes = document.querySelectorAll('.recipient-checkbox:checked');
     const phones = Array.from(checkedBoxes).map(cb => cb.dataset.phone);
+
+    // Validaciones
+    if (!campaignName) {
+      alert('Debes ingresar un nombre para la campaña');
+      return;
+    }
 
     if (phones.length === 0 || !message) {
       alert('Debes escribir un mensaje y seleccionar al menos un destinatario');
       return;
     }
 
+    // Obtener filtros aplicados
+    const filters = {
+      hasShopify: document.getElementById('modal-filter-shopify').value,
+      hasScheduled: document.getElementById('modal-filter-scheduled').value,
+      conversionStatus: document.getElementById('modal-filter-status').value,
+      leadTemperature: document.getElementById('modal-filter-temperature').value,
+    };
+
     // Confirmación
     const confirm = window.confirm(
       `¿Estás seguro de enviar este mensaje a ${phones.length} contacto${phones.length > 1 ? 's' : ''}?\n\n` +
+      `Campaña: ${campaignName}\n\n` +
       `Los números son:\n${phones.slice(0, 5).map(p => this.formatPhone(p)).join('\n')}` +
       `${phones.length > 5 ? `\n... y ${phones.length - 5} más` : ''}`
     );
@@ -1296,7 +1334,12 @@ class DashboardApp {
       const response = await fetch('/api/dashboard/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phones, message }),
+        body: JSON.stringify({
+          phones,
+          message,
+          campaignName,
+          filters,
+        }),
       });
 
       const result = await response.json();
@@ -1307,18 +1350,24 @@ class DashboardApp {
           <div class="success-message">
             <span class="success-message-icon">✅</span>
             <div>
-              <strong>Mensajes enviados correctamente</strong><br>
-              <small>${result.data.summary.sent} enviados, ${result.data.summary.failed} fallidos (${result.data.summary.successRate}% éxito)</small>
+              <strong>Campaña "${result.data.campaignName}" creada correctamente</strong><br>
+              <small>${result.data.summary.sent} enviados, ${result.data.summary.failed} fallidos (${result.data.summary.successRate}% éxito)</small><br>
+              <small style="margin-top: 4px; display: block;">
+                <a href="#campaigns" onclick="app.navigateTo('campaigns'); return false;" style="color: #3b82f6; text-decoration: underline;">
+                  Ver detalles de la campaña →
+                </a>
+              </small>
             </div>
           </div>
         `;
 
         // Limpiar formulario
+        document.getElementById('campaign-name').value = '';
         document.getElementById('mass-message-text').value = '';
         this.selectAllRecipients(false);
 
-        // Cerrar modal después de 3 segundos
-        setTimeout(() => this.closeMassMessageModal(), 3000);
+        // Cerrar modal después de 4 segundos
+        setTimeout(() => this.closeMassMessageModal(), 4000);
       } else {
         throw new Error(result.error || 'Error desconocido');
       }
