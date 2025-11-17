@@ -924,6 +924,269 @@ class DashboardController {
       });
     }
   }
+
+  /**
+   * NUEVO: Preview de destinatarios según filtros
+   * Muestra lista de números que recibirían el mensaje según los filtros aplicados
+   */
+  async previewRecipients(req, res) {
+    try {
+      const {
+        hasShopify,
+        scheduled,
+        conversionStatus,
+        leadTemperature,
+        minLeadScore,
+      } = req.body;
+
+      // Construir filtros para leadData
+      const leadWhere = {};
+
+      if (hasShopify === true) {
+        leadWhere.hasShopify = true;
+      }
+
+      if (conversionStatus && conversionStatus !== 'all') {
+        if (conversionStatus === 'none') {
+          leadWhere.conversionStatus = null;
+        } else {
+          leadWhere.conversionStatus = conversionStatus;
+        }
+      }
+
+      // Obtener leads que cumplen los criterios
+      const leads = await prisma.leadData.findMany({
+        where: leadWhere,
+        include: {
+          conversations: {
+            include: {
+              messages: {
+                orderBy: { timestamp: 'desc' },
+                take: 1,
+              },
+            },
+            orderBy: { updatedAt: 'desc' },
+          },
+        },
+      });
+
+      // Filtrar por criterios adicionales
+      let filteredLeads = leads;
+
+      // Filtrar por scheduled
+      if (scheduled === true) {
+        filteredLeads = filteredLeads.filter(lead =>
+          lead.conversations.some(conv => conv.scheduledMeeting)
+        );
+      } else if (scheduled === false) {
+        filteredLeads = filteredLeads.filter(lead =>
+          !lead.conversations.some(conv => conv.scheduledMeeting)
+        );
+      }
+
+      // Filtrar por temperatura
+      if (leadTemperature && leadTemperature !== 'all') {
+        filteredLeads = filteredLeads.filter(lead => {
+          const bestTemp = lead.conversations.reduce((best, c) => {
+            const tempPriority = { hot: 3, warm: 2, cold: 1 };
+            return (tempPriority[c.leadTemperature] || 0) > (tempPriority[best] || 0)
+              ? c.leadTemperature
+              : best;
+          }, 'cold');
+          return bestTemp === leadTemperature;
+        });
+      }
+
+      // Filtrar por lead score mínimo
+      if (minLeadScore && minLeadScore > 0) {
+        filteredLeads = filteredLeads.filter(lead => {
+          const bestScore = Math.max(...lead.conversations.map(c => c.leadScore), 0);
+          return bestScore >= minLeadScore;
+        });
+      }
+
+      // Formatear respuesta con información útil
+      const recipients = filteredLeads.map(lead => {
+        const latestConv = lead.conversations[0];
+        const bestScore = Math.max(...lead.conversations.map(c => c.leadScore), 0);
+        const hasScheduled = lead.conversations.some(c => c.scheduledMeeting);
+
+        return {
+          phone: lead.phone,
+          name: lead.name || 'Sin nombre',
+          businessType: lead.businessType || 'No especificado',
+          hasShopify: lead.hasShopify,
+          leadScore: bestScore,
+          scheduledMeeting: hasScheduled,
+          conversionStatus: lead.conversionStatus,
+          lastMessage: latestConv?.messages[0]?.content || 'Sin mensajes',
+          lastActivity: latestConv?.updatedAt || lead.updatedAt,
+        };
+      });
+
+      // Ordenar por última actividad (más reciente primero)
+      recipients.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+      logger.info('👁️ Preview de destinatarios generado', {
+        totalRecipients: recipients.length,
+        filters: { hasShopify, scheduled, conversionStatus, leadTemperature, minLeadScore },
+      });
+
+      res.json(serializeBigInt({
+        success: true,
+        data: {
+          recipients,
+          count: recipients.length,
+          filters: {
+            hasShopify,
+            scheduled,
+            conversionStatus,
+            leadTemperature,
+            minLeadScore,
+          },
+        },
+      }));
+
+    } catch (error) {
+      logger.error('Error generando preview de destinatarios:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error generando preview',
+      });
+    }
+  }
+
+  /**
+   * NUEVO: Enviar mensaje a uno o varios leads desde el dashboard
+   * Guarda el mensaje en BD para que la IA tenga contexto cuando respondan
+   */
+  async sendMessage(req, res) {
+    try {
+      const { phones, message, source = 'manual_dashboard' } = req.body;
+
+      // Validaciones
+      if (!phones || !Array.isArray(phones) || phones.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Debe proporcionar al menos un número de teléfono',
+        });
+      }
+
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'El mensaje no puede estar vacío',
+        });
+      }
+
+      if (message.length > 1000) {
+        return res.status(400).json({
+          success: false,
+          error: 'El mensaje no puede exceder 1000 caracteres',
+        });
+      }
+
+      logger.info('📤 Iniciando envío masivo de mensajes', {
+        recipientCount: phones.length,
+        messageLength: message.length,
+        source,
+      });
+
+      const results = {
+        sent: [],
+        failed: [],
+        total: phones.length,
+      };
+
+      // Importar servicios necesarios
+      const whatsappService = require('../services/whatsappService');
+      const conversationService = require('../services/conversationService');
+
+      // Enviar mensajes con rate limiting (1 mensaje por segundo para no saturar WhatsApp API)
+      for (let i = 0; i < phones.length; i++) {
+        const phone = phones[i];
+
+        try {
+          // 1. Enviar mensaje por WhatsApp
+          await whatsappService.sendTextMessage(phone, message);
+
+          // 2. Obtener o crear conversación para este teléfono
+          const conversation = await conversationService.getOrCreateConversation(phone);
+
+          // 3. Guardar mensaje en BD como 'assistant' para que la IA lo vea en el historial
+          await conversationService.saveMessage(
+            conversation.id,
+            'assistant',
+            message,
+            null,
+            null
+          );
+
+          // 4. Guardar mensaje del sistema para tracking
+          await conversationService.saveMessage(
+            conversation.id,
+            'system',
+            `📤 Mensaje manual enviado desde dashboard (${source})`,
+            null,
+            0
+          );
+
+          results.sent.push({
+            phone,
+            status: 'success',
+            timestamp: new Date(),
+          });
+
+          logger.info('✅ Mensaje enviado correctamente', { phone, index: i + 1, total: phones.length });
+
+          // Rate limiting: esperar 1 segundo entre mensajes (excepto el último)
+          if (i < phones.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+        } catch (error) {
+          logger.error('❌ Error enviando mensaje', { phone, error: error.message });
+
+          results.failed.push({
+            phone,
+            status: 'failed',
+            error: error.message,
+            timestamp: new Date(),
+          });
+        }
+      }
+
+      // Log final
+      logger.info('📊 Envío masivo completado', {
+        total: results.total,
+        sent: results.sent.length,
+        failed: results.failed.length,
+        successRate: `${((results.sent.length / results.total) * 100).toFixed(1)}%`,
+      });
+
+      res.json(serializeBigInt({
+        success: true,
+        data: {
+          message: `Envío completado: ${results.sent.length} exitosos, ${results.failed.length} fallidos`,
+          results,
+          summary: {
+            total: results.total,
+            sent: results.sent.length,
+            failed: results.failed.length,
+            successRate: parseFloat(((results.sent.length / results.total) * 100).toFixed(1)),
+          },
+        },
+      }));
+
+    } catch (error) {
+      logger.error('Error en envío masivo de mensajes:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error enviando mensajes',
+        details: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new DashboardController();

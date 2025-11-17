@@ -24,6 +24,9 @@ class DashboardApp {
     // Configurar eventos
     this.setupEventListeners();
 
+    // Configurar botón de envío masivo
+    this.setupMassMessageButton();
+
     // Auto-refresh cada 10 segundos
     this.startAutoRefresh();
   }
@@ -1000,6 +1003,340 @@ class DashboardApp {
       this.renderLeadsTable(leads);
     } catch (error) {
       console.error('Error filtrando leads:', error);
+    }
+  }
+
+  /**
+   * ==============================================
+   * ENVÍO MASIVO DE MENSAJES
+   * ==============================================
+   */
+
+  setupMassMessageButton() {
+    const btn = document.getElementById('btn-send-message');
+    if (btn) {
+      btn.addEventListener('click', () => this.showMassMessageModal());
+    }
+  }
+
+  async showMassMessageModal() {
+    // Crear modal
+    const modal = document.createElement('div');
+    modal.className = 'mass-message-modal';
+    modal.id = 'mass-message-modal';
+
+    modal.innerHTML = `
+      <div class="mass-message-modal-content">
+        <div class="mass-message-modal-header">
+          <h3>📤 Enviar Mensaje Masivo</h3>
+          <button class="mass-message-modal-close">&times;</button>
+        </div>
+        <div class="mass-message-modal-body">
+          <div id="message-status"></div>
+
+          <!-- Formulario de mensaje -->
+          <div class="form-group">
+            <label for="mass-message-text">Mensaje</label>
+            <textarea
+              id="mass-message-text"
+              class="form-textarea"
+              placeholder="Escribe tu mensaje aquí..."
+              maxlength="1000"
+            ></textarea>
+            <div class="char-counter" id="char-counter">0 / 1000 caracteres</div>
+            <small>El mensaje se enviará exactamente como lo escribas, con saltos de línea incluidos.</small>
+          </div>
+
+          <!-- Filtros -->
+          <div class="filter-section">
+            <h4>🎯 Filtrar destinatarios</h4>
+            <div class="filter-grid">
+              <div class="filter-item">
+                <label>Shopify</label>
+                <select id="modal-filter-shopify">
+                  <option value="">Todos</option>
+                  <option value="true">Solo con Shopify</option>
+                  <option value="false">Sin Shopify</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>Agendamiento</label>
+                <select id="modal-filter-scheduled">
+                  <option value="">Todos</option>
+                  <option value="false" selected>No agendaron</option>
+                  <option value="true">Sí agendaron</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>Estado de conversión</label>
+                <select id="modal-filter-status">
+                  <option value="all">Todos</option>
+                  <option value="none" selected>Sin conversión</option>
+                  <option value="trial_14_days">Trial 14 días</option>
+                  <option value="paid_monthly_bonus">Pagando</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>Temperatura</label>
+                <select id="modal-filter-temperature">
+                  <option value="all">Todas</option>
+                  <option value="hot">Hot (🔥)</option>
+                  <option value="warm">Warm (🟡)</option>
+                  <option value="cold">Cold (❄️)</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top: 12px;">
+              <button id="btn-apply-filters" class="btn-secondary">🔍 Aplicar Filtros</button>
+            </div>
+          </div>
+
+          <!-- Preview de destinatarios -->
+          <div class="preview-section">
+            <div class="preview-header">
+              <h4>📋 Destinatarios</h4>
+              <span class="preview-count zero" id="preview-count">0 seleccionados</span>
+            </div>
+            <div class="recipients-list" id="recipients-list">
+              <div class="empty-recipients">
+                <div class="empty-recipients-icon">👥</div>
+                <p>Haz clic en "Aplicar Filtros" para ver los destinatarios</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mass-message-modal-footer">
+          <div class="select-all-controls">
+            <button class="btn-link" id="btn-select-all">Seleccionar todos</button>
+            <button class="btn-link" id="btn-deselect-all">Deseleccionar todos</button>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="btn-cancel">Cancelar</button>
+            <button class="btn-primary" id="btn-send" disabled>
+              Enviar Mensaje
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    modal.querySelector('.mass-message-modal-close').addEventListener('click', () => this.closeMassMessageModal());
+    modal.querySelector('#btn-cancel').addEventListener('click', () => this.closeMassMessageModal());
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) this.closeMassMessageModal();
+    });
+
+    // Contador de caracteres
+    const textarea = modal.querySelector('#mass-message-text');
+    const charCounter = modal.querySelector('#char-counter');
+    textarea.addEventListener('input', () => {
+      const length = textarea.value.length;
+      charCounter.textContent = `${length} / 1000 caracteres`;
+
+      if (length > 900) {
+        charCounter.className = 'char-counter danger';
+      } else if (length > 700) {
+        charCounter.className = 'char-counter warning';
+      } else {
+        charCounter.className = 'char-counter';
+      }
+
+      this.updateSendButtonState();
+    });
+
+    // Botón aplicar filtros
+    modal.querySelector('#btn-apply-filters').addEventListener('click', () => this.loadRecipients());
+
+    // Botones select/deselect all
+    modal.querySelector('#btn-select-all').addEventListener('click', () => this.selectAllRecipients(true));
+    modal.querySelector('#btn-deselect-all').addEventListener('click', () => this.selectAllRecipients(false));
+
+    // Botón enviar
+    modal.querySelector('#btn-send').addEventListener('click', () => this.sendMassMessage());
+
+    // Cargar destinatarios inicialmente con filtros por defecto
+    setTimeout(() => this.loadRecipients(), 100);
+  }
+
+  closeMassMessageModal() {
+    const modal = document.getElementById('mass-message-modal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+
+  async loadRecipients() {
+    try {
+      const hasShopify = document.getElementById('modal-filter-shopify').value;
+      const scheduled = document.getElementById('modal-filter-scheduled').value;
+      const conversionStatus = document.getElementById('modal-filter-status').value;
+      const leadTemperature = document.getElementById('modal-filter-temperature').value;
+
+      const filters = {
+        hasShopify: hasShopify === 'true' ? true : hasShopify === 'false' ? false : undefined,
+        scheduled: scheduled === 'true' ? true : scheduled === 'false' ? false : undefined,
+        conversionStatus: conversionStatus !== 'all' ? conversionStatus : undefined,
+        leadTemperature: leadTemperature !== 'all' ? leadTemperature : undefined,
+      };
+
+      const response = await fetch('/api/dashboard/preview-recipients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters),
+      });
+
+      const { data } = await response.json();
+      this.renderRecipients(data.recipients);
+
+    } catch (error) {
+      console.error('Error cargando destinatarios:', error);
+      this.showError('Error cargando destinatarios');
+    }
+  }
+
+  renderRecipients(recipients) {
+    const container = document.getElementById('recipients-list');
+
+    if (recipients.length === 0) {
+      container.innerHTML = `
+        <div class="empty-recipients">
+          <div class="empty-recipients-icon">🔍</div>
+          <p>No se encontraron destinatarios con estos filtros</p>
+        </div>
+      `;
+      this.updateSendButtonState();
+      return;
+    }
+
+    container.innerHTML = recipients.map(recipient => `
+      <div class="recipient-item">
+        <input
+          type="checkbox"
+          class="recipient-checkbox"
+          data-phone="${recipient.phone}"
+        >
+        <div class="recipient-info">
+          <span class="recipient-phone">${this.formatPhone(recipient.phone)}</span>
+          <span class="recipient-name">${recipient.name}</span>
+          <div class="recipient-badges">
+            ${recipient.hasShopify ? '<span class="recipient-badge shopify">🛍️ Shopify</span>' : ''}
+            ${recipient.scheduledMeeting ? '<span class="recipient-badge scheduled">📅 Agendado</span>' : ''}
+            ${recipient.leadScore >= 8 ? '<span class="recipient-badge hot">🔥 Hot</span>' : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    // Event listeners para checkboxes
+    container.querySelectorAll('.recipient-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', () => this.updateSendButtonState());
+    });
+
+    this.updateSendButtonState();
+  }
+
+  selectAllRecipients(select) {
+    const checkboxes = document.querySelectorAll('.recipient-checkbox');
+    checkboxes.forEach(cb => cb.checked = select);
+    this.updateSendButtonState();
+  }
+
+  updateSendButtonState() {
+    const message = document.getElementById('mass-message-text')?.value || '';
+    const checkedBoxes = document.querySelectorAll('.recipient-checkbox:checked');
+    const sendBtn = document.getElementById('btn-send');
+    const countBadge = document.getElementById('preview-count');
+
+    if (!sendBtn) return;
+
+    const canSend = message.trim().length > 0 && checkedBoxes.length > 0;
+    sendBtn.disabled = !canSend;
+
+    // Actualizar contador
+    if (countBadge) {
+      countBadge.textContent = `${checkedBoxes.length} seleccionados`;
+      countBadge.className = checkedBoxes.length > 0 ? 'preview-count' : 'preview-count zero';
+    }
+  }
+
+  async sendMassMessage() {
+    const message = document.getElementById('mass-message-text').value.trim();
+    const checkedBoxes = document.querySelectorAll('.recipient-checkbox:checked');
+    const phones = Array.from(checkedBoxes).map(cb => cb.dataset.phone);
+
+    if (phones.length === 0 || !message) {
+      alert('Debes escribir un mensaje y seleccionar al menos un destinatario');
+      return;
+    }
+
+    // Confirmación
+    const confirm = window.confirm(
+      `¿Estás seguro de enviar este mensaje a ${phones.length} contacto${phones.length > 1 ? 's' : ''}?\n\n` +
+      `Los números son:\n${phones.slice(0, 5).map(p => this.formatPhone(p)).join('\n')}` +
+      `${phones.length > 5 ? `\n... y ${phones.length - 5} más` : ''}`
+    );
+
+    if (!confirm) return;
+
+    // Deshabilitar botón y mostrar loading
+    const sendBtn = document.getElementById('btn-send');
+    const originalText = sendBtn.textContent;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = `
+      <span class="loading-indicator">
+        <span class="loading-spinner"></span>
+        Enviando...
+      </span>
+    `;
+
+    try {
+      const response = await fetch('/api/dashboard/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phones, message }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const statusDiv = document.getElementById('message-status');
+        statusDiv.innerHTML = `
+          <div class="success-message">
+            <span class="success-message-icon">✅</span>
+            <div>
+              <strong>Mensajes enviados correctamente</strong><br>
+              <small>${result.data.summary.sent} enviados, ${result.data.summary.failed} fallidos (${result.data.summary.successRate}% éxito)</small>
+            </div>
+          </div>
+        `;
+
+        // Limpiar formulario
+        document.getElementById('mass-message-text').value = '';
+        this.selectAllRecipients(false);
+
+        // Cerrar modal después de 3 segundos
+        setTimeout(() => this.closeMassMessageModal(), 3000);
+      } else {
+        throw new Error(result.error || 'Error desconocido');
+      }
+
+    } catch (error) {
+      console.error('Error enviando mensajes:', error);
+      const statusDiv = document.getElementById('message-status');
+      statusDiv.innerHTML = `
+        <div class="error-message">
+          <span>❌</span>
+          <div>
+            <strong>Error enviando mensajes</strong><br>
+            <small>${error.message}</small>
+          </div>
+        </div>
+      `;
+      sendBtn.disabled = false;
+      sendBtn.textContent = originalText;
     }
   }
 }

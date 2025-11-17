@@ -33,4 +33,11 @@ router.patch('/leads/:phone/conversion', dashboardController.updateLeadConversio
 // POST /api/dashboard/phone/:phone/mark-read - Marcar conversación como leída
 router.post('/phone/:phone/mark-read', dashboardController.markAsRead);
 
+// NUEVO: Envío de mensajes desde el dashboard
+// POST /api/dashboard/send-message - Enviar mensaje a uno o varios leads
+router.post('/send-message', dashboardController.sendMessage);
+
+// POST /api/dashboard/preview-recipients - Preview de destinatarios según filtros
+router.post('/preview-recipients', dashboardController.previewRecipients);
+
 module.exports = router;
