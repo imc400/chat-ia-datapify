@@ -56,9 +56,21 @@ class DashboardApp {
           this.loadLeadsPage();
         } else if (targetPage === 'analytics') {
           this.loadAnalyticsFunnel();
+        } else if (targetPage === 'campaigns') {
+          this.loadCampaignsPage();
         }
       });
     });
+  }
+
+  /**
+   * Método público para navegar programáticamente
+   */
+  navigateTo(page) {
+    const targetNav = document.querySelector(`[data-page="${page}"]`);
+    if (targetNav) {
+      targetNav.click();
+    }
   }
 
   /**
@@ -1386,6 +1398,258 @@ class DashboardApp {
       `;
       sendBtn.disabled = false;
       sendBtn.textContent = originalText;
+    }
+  }
+
+  /**
+   * ======================
+   * CAMPAÑAS
+   * ======================
+   */
+
+  async loadCampaignsPage() {
+    try {
+      const response = await fetch('/api/dashboard/campaigns');
+      const result = await response.json();
+
+      if (result.success) {
+        this.renderCampaigns(result.data.campaigns);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error cargando campañas:', error);
+      document.getElementById('campaigns-table').innerHTML = `
+        <div class="error-message">
+          <span>❌</span>
+          <div>
+            <strong>Error cargando campañas</strong><br>
+            <small>${error.message}</small>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  renderCampaigns(campaigns) {
+    const container = document.getElementById('campaigns-table');
+
+    if (campaigns.length === 0) {
+      container.innerHTML = `
+        <div class="empty-campaigns">
+          <div class="empty-campaigns-icon">📭</div>
+          <h3>No hay campañas todavía</h3>
+          <p>Crea tu primera campaña enviando un mensaje masivo desde la sección de Leads</p>
+          <button class="btn-primary" onclick="app.navigateTo('leads')">
+            Ir a Leads
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    const tableHTML = `
+      <table class="campaigns-table">
+        <thead>
+          <tr>
+            <th>Nombre de Campaña</th>
+            <th>Fecha</th>
+            <th>Destinatarios</th>
+            <th>Enviados</th>
+            <th>Fallidos</th>
+            <th>Tasa de Éxito</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${campaigns.map(campaign => {
+            const successRate = campaign.totalRecipients > 0
+              ? ((campaign.sentCount / campaign.totalRecipients) * 100).toFixed(1)
+              : 0;
+
+            const statusBadge = campaign.status === 'completed'
+              ? '<span class="status-badge success">✅ Completada</span>'
+              : campaign.status === 'sending'
+              ? '<span class="status-badge warning">⏳ Enviando</span>'
+              : '<span class="status-badge error">❌ Error</span>';
+
+            return `
+              <tr>
+                <td>
+                  <div class="campaign-name">
+                    <strong>${campaign.name}</strong>
+                    <small>${campaign.message.substring(0, 50)}${campaign.message.length > 50 ? '...' : ''}</small>
+                  </div>
+                </td>
+                <td>${new Date(campaign.createdAt).toLocaleString('es-CL', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</td>
+                <td>${campaign.totalRecipients}</td>
+                <td><span class="badge-success">${campaign.sentCount}</span></td>
+                <td><span class="badge-error">${campaign.failedCount}</span></td>
+                <td>
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${successRate}%"></div>
+                  </div>
+                  <span class="progress-text">${successRate}%</span>
+                </td>
+                <td>${statusBadge}</td>
+                <td>
+                  <button class="btn-link" onclick="app.showCampaignDetail('${campaign.id}')">
+                    Ver Detalle
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = tableHTML;
+  }
+
+  async showCampaignDetail(campaignId) {
+    try {
+      const response = await fetch(`/api/dashboard/campaigns/${campaignId}`);
+      const result = await response.json();
+
+      if (result.success) {
+        this.renderCampaignDetailModal(result.data);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error cargando detalle de campaña:', error);
+      alert('Error cargando detalle de campaña: ' + error.message);
+    }
+  }
+
+  renderCampaignDetailModal(campaign) {
+    // Crear modal
+    const modal = document.createElement('div');
+    modal.className = 'campaign-detail-modal';
+    modal.id = 'campaign-detail-modal';
+
+    const successRate = campaign.totalRecipients > 0
+      ? ((campaign.sentCount / campaign.totalRecipients) * 100).toFixed(1)
+      : 0;
+
+    modal.innerHTML = `
+      <div class="campaign-detail-modal-content">
+        <div class="campaign-detail-header">
+          <h3>📊 ${campaign.name}</h3>
+          <button class="campaign-detail-close">&times;</button>
+        </div>
+
+        <div class="campaign-detail-body">
+          <!-- Stats -->
+          <div class="campaign-stats-grid">
+            <div class="campaign-stat-card">
+              <div class="stat-icon">👥</div>
+              <div class="stat-value">${campaign.totalRecipients}</div>
+              <div class="stat-label">Total Destinatarios</div>
+            </div>
+            <div class="campaign-stat-card success">
+              <div class="stat-icon">✅</div>
+              <div class="stat-value">${campaign.sentCount}</div>
+              <div class="stat-label">Enviados</div>
+            </div>
+            <div class="campaign-stat-card error">
+              <div class="stat-icon">❌</div>
+              <div class="stat-value">${campaign.failedCount}</div>
+              <div class="stat-label">Fallidos</div>
+            </div>
+            <div class="campaign-stat-card">
+              <div class="stat-icon">📈</div>
+              <div class="stat-value">${successRate}%</div>
+              <div class="stat-label">Tasa de Éxito</div>
+            </div>
+          </div>
+
+          <!-- Mensaje -->
+          <div class="campaign-message-box">
+            <h4>📝 Mensaje Enviado</h4>
+            <pre>${campaign.message}</pre>
+          </div>
+
+          <!-- Filtros Aplicados -->
+          ${campaign.filters ? `
+            <div class="campaign-filters-box">
+              <h4>🎯 Filtros Aplicados</h4>
+              <div class="filters-tags">
+                ${campaign.filters.hasShopify === 'true' ? '<span class="filter-tag">🛍️ Con Shopify</span>' : ''}
+                ${campaign.filters.hasShopify === 'false' ? '<span class="filter-tag">❌ Sin Shopify</span>' : ''}
+                ${campaign.filters.hasScheduled === 'true' ? '<span class="filter-tag">📅 Agendaron</span>' : ''}
+                ${campaign.filters.hasScheduled === 'false' ? '<span class="filter-tag">❌ No agendaron</span>' : ''}
+                ${campaign.filters.conversionStatus !== 'all' ? `<span class="filter-tag">Estado: ${campaign.filters.conversionStatus}</span>` : ''}
+                ${campaign.filters.leadTemperature !== 'all' ? `<span class="filter-tag">🌡️ ${campaign.filters.leadTemperature}</span>` : ''}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Lista de Destinatarios -->
+          <div class="campaign-recipients-box">
+            <h4>📋 Destinatarios (${campaign.recipients.length})</h4>
+            <div class="recipients-table-wrapper">
+              <table class="recipients-detail-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Teléfono</th>
+                    <th>Estado</th>
+                    <th>Enviado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${campaign.recipients.map(recipient => {
+                    const statusBadge = recipient.status === 'sent'
+                      ? '<span class="status-badge success">✅ Enviado</span>'
+                      : recipient.status === 'failed'
+                      ? '<span class="status-badge error">❌ Fallido</span>'
+                      : '<span class="status-badge">⏳ Pendiente</span>';
+
+                    return `
+                      <tr>
+                        <td>${recipient.leadName || 'Sin nombre'}</td>
+                        <td>${this.formatPhone(recipient.phone)}</td>
+                        <td>${statusBadge}</td>
+                        <td>${recipient.sentAt ? new Date(recipient.sentAt).toLocaleString('es-CL') : '-'}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="campaign-detail-footer">
+          <button class="btn-secondary" onclick="app.closeCampaignDetailModal()">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    modal.querySelector('.campaign-detail-close').addEventListener('click', () => this.closeCampaignDetailModal());
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) this.closeCampaignDetailModal();
+    });
+  }
+
+  closeCampaignDetailModal() {
+    const modal = document.getElementById('campaign-detail-modal');
+    if (modal) {
+      modal.remove();
     }
   }
 }
