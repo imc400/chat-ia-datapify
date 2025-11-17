@@ -1039,6 +1039,8 @@ class DashboardApp {
   setupLeadsFilters() {
     const filterStatus = document.getElementById('filter-lead-status');
     const filterShopify = document.getElementById('filter-lead-shopify');
+    const filterScheduled = document.getElementById('filter-lead-scheduled');
+    const filterResponse = document.getElementById('filter-lead-response');
 
     if (filterStatus) {
       filterStatus.addEventListener('change', () => this.filterLeads());
@@ -1047,19 +1049,33 @@ class DashboardApp {
     if (filterShopify) {
       filterShopify.addEventListener('change', () => this.filterLeads());
     }
+
+    if (filterScheduled) {
+      filterScheduled.addEventListener('change', () => this.filterLeads());
+    }
+
+    if (filterResponse) {
+      filterResponse.addEventListener('change', () => this.filterLeads());
+    }
   }
 
   async filterLeads() {
     const status = document.getElementById('filter-lead-status').value;
     const shopify = document.getElementById('filter-lead-shopify').value;
+    const scheduled = document.getElementById('filter-lead-scheduled').value;
+    const response = document.getElementById('filter-lead-response').value;
 
     let url = '/api/dashboard/leads?limit=100';
     if (status && status !== 'all') url += `&status=${status}`;
     if (shopify === 'true') url += `&hasShopify=true`;
+    if (scheduled === 'true') url += `&scheduledMeeting=true`;
+    if (scheduled === 'false') url += `&scheduledMeeting=false`;
+    if (response === 'no-response') url += `&responseStatus=no-response`;
+    if (response === 'active') url += `&responseStatus=active`;
 
     try {
-      const response = await fetch(url);
-      const { data: leads } = await response.json();
+      const fetchResponse = await fetch(url);
+      const { data: leads } = await fetchResponse.json();
       this.renderLeadsTable(leads);
     } catch (error) {
       console.error('Error filtrando leads:', error);

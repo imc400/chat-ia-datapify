@@ -606,6 +606,8 @@ class DashboardController {
         status,        // 'trial_14_days', 'paid_monthly_bonus', 'paid_after_trial', 'none'
         hasShopify,
         scheduled,
+        scheduledMeeting,  // 'true' or 'false'
+        responseStatus,    // 'no-response' or 'active'
         limit = 100,
         offset = 0,
         sortBy = 'updatedAt',
@@ -640,11 +642,22 @@ class DashboardController {
         take: parseInt(limit),
       });
 
-      // Filtrar por scheduled si se especifica
+      // Filtrar por scheduled si se especifica (legacy parameter)
       let filteredLeads = leads;
       if (scheduled === 'true') {
         filteredLeads = leads.filter(lead =>
           lead.conversations.some(conv => conv.scheduledMeeting)
+        );
+      }
+
+      // Filtrar por scheduledMeeting (nuevo parámetro)
+      if (scheduledMeeting === 'true') {
+        filteredLeads = filteredLeads.filter(lead =>
+          lead.conversations.some(conv => conv.scheduledMeeting)
+        );
+      } else if (scheduledMeeting === 'false') {
+        filteredLeads = filteredLeads.filter(lead =>
+          !lead.conversations.some(conv => conv.scheduledMeeting)
         );
       }
 
@@ -727,6 +740,16 @@ class DashboardController {
         // ⭐ FUENTE DE VERDAD: Google Calendar (no solo la DB)
         const reallyScheduled = calendarEventCount > 0 || hasScheduledMeeting;
 
+        // Calcular días desde el último mensaje
+        const lastMsg = latestConv?.messages[0] || null;
+        let daysSinceLastMessage = null;
+        if (lastMsg?.timestamp) {
+          const now = new Date();
+          const lastMsgDate = new Date(lastMsg.timestamp);
+          const diffTime = Math.abs(now - lastMsgDate);
+          daysSinceLastMessage = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        }
+
         return {
           id: lead.id,
           phone: lead.phone,
@@ -746,16 +769,34 @@ class DashboardController {
           calendarEventCount,
           leadTemperature: bestTemperature,
           leadScore: bestLeadScore,
-          lastMessage: latestConv?.messages[0] || null,
+          lastMessage: lastMsg,
+          daysSinceLastMessage, // ⭐ NUEVO: Días desde el último mensaje
           conversationCount: lead.conversations.length,
           updatedAt: lead.updatedAt,
           createdAt: lead.extractedAt,
         };
       }));
 
+      // Filtrar por responseStatus (después del enriquecimiento)
+      let finalLeads = enrichedLeads;
+      if (responseStatus === 'no-response') {
+        // Leads sin respuesta: última mensaje es del asistente (bot escribió pero no respondieron)
+        // Excluimos mensajes de sistema
+        finalLeads = enrichedLeads.filter(lead => {
+          const lastMsg = lead.lastMessage;
+          return lastMsg && lastMsg.role === 'assistant';
+        });
+      } else if (responseStatus === 'active') {
+        // Leads activos: última mensaje es del usuario (están conversando activamente)
+        finalLeads = enrichedLeads.filter(lead => {
+          const lastMsg = lead.lastMessage;
+          return lastMsg && lastMsg.role === 'user';
+        });
+      }
+
       const total = await prisma.leadData.count({ where: leadWhere });
 
-      res.json(serializeBigInt({ success: true, data: enrichedLeads,
+      res.json(serializeBigInt({ success: true, data: finalLeads,
         pagination: {
           total,
           limit: parseInt(limit),
