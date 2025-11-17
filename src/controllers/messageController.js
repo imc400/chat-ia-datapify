@@ -100,12 +100,25 @@ class MessageController {
       const agentConfirmedLink = aiResponse.toLowerCase().includes('te paso el link') ||
                                  aiResponse.toLowerCase().includes('te envío el link') ||
                                  aiResponse.toLowerCase().includes('te mando el link') ||
-                                 aiResponse.toLowerCase().includes('te enviaré el link');
+                                 aiResponse.toLowerCase().includes('te enviaré el link') ||
+                                 aiResponse.toLowerCase().includes('para que elijas el día') ||
+                                 aiResponse.toLowerCase().includes('enlace al calendario');
 
       // ENVIAR LINK SI:
       // 1. Usuario confirmó Y bot había preguntado por agendar
       // 2. O bot explícitamente dijo "te paso el link"
-      if ((agentAskedToSchedule && userConfirms) || agentConfirmedLink) {
+
+      // CRÍTICO: Verificar si ya se envió el link antes (prevenir duplicados)
+      const linkAlreadySent = history.some(msg =>
+        msg.role === 'system' && msg.content.includes('Link de agendamiento enviado')
+      );
+
+      if (linkAlreadySent) {
+        logger.warn('⚠️ Link ya fue enviado previamente en esta conversación', {
+          conversationId: conversation.id,
+          phone: from
+        });
+      } else if ((agentAskedToSchedule && userConfirms) || agentConfirmedLink) {
         // Construir memoria conversacional para personalizar mensaje
         const memory = memoryService.buildConversationalMemory(history);
 
