@@ -4,6 +4,16 @@ const calendarService = require('../services/calendarService');
 
 const prisma = new PrismaClient();
 
+/**
+ * Helper para convertir BigInt a String en objetos JSON
+ * Prisma devuelve BigInt para campos tipo BigInt en la DB, pero JSON.stringify no los soporta
+ */
+function serializeBigInt(obj) {
+  return JSON.parse(JSON.stringify(obj, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  ));
+}
+
 class DashboardController {
   /**
    * Obtener todas las conversaciones AGRUPADAS POR TELÉFONO
@@ -192,7 +202,7 @@ class DashboardController {
         };
       }));
 
-      res.json({
+      res.json(serializeBigInt({
         success: true,
         data: formatted,
         pagination: {
@@ -201,14 +211,14 @@ class DashboardController {
           offset: parseInt(offset),
           hasMore: offset + limit < grouped.length,
         },
-      });
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo conversaciones:', error);
       res.status(500).json({
         success: false,
         error: 'Error obteniendo conversaciones',
-      });
+      }));
     }
   }
 
@@ -312,9 +322,7 @@ class DashboardController {
         logger.warn('Error verificando calendario para', phone, error.message);
       }
 
-      res.json({
-        success: true,
-        data: {
+      res.json(serializeBigInt({ success: true, data: {
           phone,
           conversations: conversations.map(c => ({
             id: c.id,
@@ -337,7 +345,7 @@ class DashboardController {
             lastActivity: conversations[conversations.length - 1].updatedAt,
           },
         },
-      });
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo conversaciones por teléfono:', error);
@@ -373,10 +381,8 @@ class DashboardController {
         });
       }
 
-      res.json({
-        success: true,
-        data: conversation,
-      });
+      res.json(serializeBigInt({ success: true, data: conversation,
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo conversación:', error);
@@ -406,10 +412,8 @@ class DashboardController {
         take: parseInt(limit),
       });
 
-      res.json({
-        success: true,
-        data: messages.reverse(), // Ordenar ascendente para mostrar
-      });
+      res.json(serializeBigInt({ success: true, data: messages.reverse(), // Ordenar ascendente para mostrar
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo mensajes:', error);
@@ -438,10 +442,8 @@ class DashboardController {
         },
       });
 
-      res.json({
-        success: true,
-        data: conversation,
-      });
+      res.json(serializeBigInt({ success: true, data: conversation,
+      }));
 
     } catch (error) {
       logger.error('Error etiquetando conversación:', error);
@@ -494,9 +496,7 @@ class DashboardController {
         ? ((recentConversions / recentTotal) * 100).toFixed(1)
         : 0;
 
-      res.json({
-        success: true,
-        data: {
+      res.json(serializeBigInt({ success: true, data: {
           total: totalConversations,
           active: activeConversations,
           scheduled: scheduledMeetings,
@@ -511,7 +511,7 @@ class DashboardController {
             conversionRate: parseFloat(conversionRate),
           },
         },
-      });
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo estadísticas:', error);
@@ -681,16 +681,14 @@ class DashboardController {
 
       const total = await prisma.leadData.count({ where: leadWhere });
 
-      res.json({
-        success: true,
-        data: enrichedLeads,
+      res.json(serializeBigInt({ success: true, data: enrichedLeads,
         pagination: {
           total,
           limit: parseInt(limit),
           offset: parseInt(offset),
           hasMore: offset + limit < total,
         },
-      });
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo leads:', error);
@@ -748,10 +746,8 @@ class DashboardController {
         leadId: updatedLead.id,
       });
 
-      res.json({
-        success: true,
-        data: updatedLead,
-      });
+      res.json(serializeBigInt({ success: true, data: updatedLead,
+      }));
 
     } catch (error) {
       logger.error('Error actualizando estado de conversión:', error);
@@ -789,9 +785,7 @@ class DashboardController {
       const conversionRate = totalLeads > 0 ? ((totalPaid / totalLeads) * 100).toFixed(1) : 0;
       const shopifyConversionRate = withShopify > 0 ? ((scheduled / withShopify) * 100).toFixed(1) : 0;
 
-      res.json({
-        success: true,
-        data: {
+      res.json(serializeBigInt({ success: true, data: {
           totalLeads,
           byStatus: {
             trial_14_days: trial14Days,
@@ -808,7 +802,7 @@ class DashboardController {
             shopifyToScheduledRate: parseFloat(shopifyConversionRate),
           },
         },
-      });
+      }));
 
     } catch (error) {
       logger.error('Error obteniendo estadísticas de conversión:', error);
