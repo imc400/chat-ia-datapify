@@ -282,18 +282,22 @@ router.get('/funnel', async (req, res) => {
     });
     const totalLeads = uniquePhones.length;
 
-    // Obtener todos los leads con sus conversaciones
+    // 2. ETAPA 2: Agendaron reunión (scheduledMeeting = true)
+    // Contar PHONES únicos con al menos una conversación scheduled
+    const scheduledConversations = await prisma.conversation.groupBy({
+      by: ['phone'],
+      where: {
+        scheduledMeeting: true,
+      },
+    });
+    const totalScheduled = scheduledConversations.length;
+
+    // Obtener todos los leads para etapas de conversión (trial/pago)
     const allLeads = await prisma.leadData.findMany({
       include: {
         conversations: true,
       },
     });
-
-    // 2. ETAPA 2: Agendaron reunión (scheduledMeeting = true en alguna conversación)
-    const leadsScheduled = allLeads.filter(lead =>
-      lead.conversations.some(conv => conv.scheduledMeeting === true)
-    );
-    const totalScheduled = leadsScheduled.length;
 
     // 3. ETAPA 3A: Empezaron trial de 14 días (actualmente en trial)
     const leadsTrial = allLeads.filter(lead =>
