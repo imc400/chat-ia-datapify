@@ -108,6 +108,12 @@ class MessageController {
       // 7. GENERAR RESPUESTA CON OPENAI ASSISTANT
       // Intenta usar Assistant API, fallback a chat completions si falla
       let aiResponse;
+
+      logger.info('🔍 Intentando usar OpenAI Assistant...', {
+        conversationId: conversation.id,
+        assistantConfigured: !!process.env.OPENAI_ASSISTANT_ID,
+      });
+
       try {
         aiResponse = await assistantService.generateResponse(
           userMessage,
@@ -118,6 +124,7 @@ class MessageController {
       } catch (error) {
         logger.warn('⚠️ Error con Assistant API, usando fallback a chat completions', {
           error: error.message,
+          stack: error.stack,
         });
         // Fallback al método anterior
         aiResponse = await aiService.generateResponseWithThinking(
@@ -126,6 +133,7 @@ class MessageController {
           thinkingAnalysis,
           leadScore
         );
+        logger.info('✅ Respuesta generada con chat completions (fallback)');
       }
 
       const responseTime = Date.now() - startTime;

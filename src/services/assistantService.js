@@ -23,11 +23,11 @@ class AssistantService {
 
     if (!this.assistantId) {
       logger.warn('⚠️ OPENAI_ASSISTANT_ID no configurado. Usando chat completions como fallback.');
+    } else {
+      logger.info('✅ Assistant Service inicializado', {
+        assistantId: this.assistantId,
+      });
     }
-
-    logger.info('✅ Assistant Service inicializado', {
-      assistantId: this.assistantId ? `${this.assistantId.substring(0, 15)}...` : 'N/A',
-    });
   }
 
   /**
