@@ -1,10 +1,6 @@
 const whatsappService = require('../services/whatsappService');
-const aiService = require('../services/openaiService');
-const assistantService = require('../services/assistantService'); // 🤖 NUEVO: OpenAI Assistant
+const assistantService = require('../services/assistantService'); // 🤖 Sales Assistant (OpenAI)
 const conversationService = require('../services/conversationService');
-const calendarService = require('../services/calendarService');
-const memoryService = require('../services/memoryService');
-const thinkingEngine = require('../services/thinkingEngine'); // 🧠 NUEVO: Thinking Engine
 const config = require('../config');
 const logger = require('../utils/logger');
 
@@ -49,67 +45,10 @@ class MessageController {
       // 3. OBTENER HISTORIAL DESDE BD (últimos 10 mensajes - contexto más rico)
       const history = await conversationService.getConversationHistory(conversation.id, 10);
 
-      // 🧠 NUEVO: 4. ANÁLISIS PRE-RESPUESTA CON THINKING ENGINE
-      // El agente PIENSA antes de responder, detectando información clave
-      const thinkingAnalysis = await thinkingEngine.analyzeBeforeResponse(
-        userMessage,
-        history,
-        conversation.leadData // leadData viene incluido en conversation
-      );
-
-      logger.info('🧠 Thinking Engine completado', {
-        from,
-        shopifyDetected: thinkingAnalysis.shopify.detected,
-        shopifyConfidence: thinkingAnalysis.shopify.confidence,
-        painLevel: thinkingAnalysis.pain.level,
-        intent: thinkingAnalysis.intent.primary,
-        isResumingAfterGap: thinkingAnalysis.temporal.isResumingAfterGap,
-        timeSinceLastMessage: thinkingAnalysis.temporal.humanReadableGap,
-      });
-
-      // 5. GUARDAR DATOS DETECTADOS EN TIEMPO REAL (ANTES de responder)
-      const leadDataUpdates = {};
-
-      if (thinkingAnalysis.shopify.detected && thinkingAnalysis.shopify.confidence > 0.7) {
-        leadDataUpdates.hasShopify = true;
-        logger.info('✅ Shopify detectado y guardado ANTES de responder', {
-          phone: from,
-          method: thinkingAnalysis.shopify.method,
-          confidence: thinkingAnalysis.shopify.confidence,
-        });
-      }
-
-      // Guardar nombre si fue extraído
-      if (thinkingAnalysis.leadInfo.name && !conversation.leadData?.name) {
-        leadDataUpdates.name = thinkingAnalysis.leadInfo.name;
-      }
-
-      // Guardar tipo de negocio si fue extraído
-      if (thinkingAnalysis.leadInfo.business && !conversation.leadData?.businessType) {
-        leadDataUpdates.businessType = thinkingAnalysis.leadInfo.business;
-      }
-
-      // Guardar si hay actualizaciones
-      if (Object.keys(leadDataUpdates).length > 0) {
-        await conversationService.updateLeadData(conversation.id, leadDataUpdates);
-      }
-
-      // 6. CALIFICAR LEAD (usando el análisis del thinking engine)
-      const leadScore = aiService.qualifyLead(history);
-      await conversationService.updateLeadScore(conversation.id, leadScore);
-
-      logger.info('🎯 Lead actualizado', {
-        from,
-        temperature: leadScore.temperature,
-        score: leadScore.score,
-        phase: leadScore.phase,
-      });
-
-      // 7. GENERAR RESPUESTA CON OPENAI ASSISTANT
-      // Intenta usar Assistant API, fallback a chat completions si falla
+      // 4. GENERAR RESPUESTA CON OPENAI ASSISTANT #1 (SALES AGENT)
       let aiResponse;
 
-      logger.info('🔍 Intentando usar OpenAI Assistant...', {
+      logger.info('🤖 Llamando Sales Assistant...', {
         conversationId: conversation.id,
         assistantConfigured: !!process.env.OPENAI_ASSISTANT_ID,
       });
@@ -118,27 +57,28 @@ class MessageController {
         aiResponse = await assistantService.generateResponse(
           userMessage,
           conversation.id,
-          thinkingAnalysis // Opcional: pasa contexto del Thinking Engine
+          null // Ya no necesitamos pasar thinking analysis
         );
-        logger.info('✅ Respuesta generada con OpenAI Assistant');
+        logger.info('✅ Respuesta generada con Sales Assistant');
       } catch (error) {
-        logger.warn('⚠️ Error con Assistant API, usando fallback a chat completions', {
+        logger.error('❌ Error con Sales Assistant:', {
           error: error.message,
           stack: error.stack,
         });
-        // Fallback al método anterior
-        aiResponse = await aiService.generateResponseWithThinking(
-          userMessage,
-          history,
-          thinkingAnalysis,
-          leadScore
-        );
-        logger.info('✅ Respuesta generada con chat completions (fallback)');
+        throw error; // No hay fallback, debe funcionar
       }
+
+      // 5. ETIQUETADO AUTOMÁTICO CON ASSISTANT #2 (DATA TAGGER)
+      // Ejecutar en paralelo, no bloqueante
+      const dataTaggerService = require('../services/dataTaggerService');
+      dataTaggerService.analyzeAndTag(userMessage, conversation.id, history)
+        .catch(error => {
+          logger.warn('⚠️ Error en Data Tagger (no crítico):', error.message);
+        });
 
       const responseTime = Date.now() - startTime;
 
-      // 8. GUARDAR RESPUESTA DEL ASISTENTE EN BD
+      // 6. GUARDAR RESPUESTA DEL ASISTENTE EN BD
       await conversationService.saveMessage(
         conversation.id,
         'assistant',
@@ -147,10 +87,10 @@ class MessageController {
         responseTime
       );
 
-      // 9. ENVIAR RESPUESTA AL USUARIO
+      // 7. ENVIAR RESPUESTA AL USUARIO
       await whatsappService.sendTextMessage(from, aiResponse);
 
-      // 10. LÓGICA DE AGENDAMIENTO - DESACTIVADA
+      // 8. LÓGICA DE AGENDAMIENTO - DESACTIVADA
       // El OpenAI Assistant ahora maneja 100% el flujo de agendamiento
       // incluyendo cuándo y cómo enviar el link de Calendly
 
