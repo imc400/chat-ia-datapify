@@ -101,7 +101,9 @@ class DashboardApp {
       const response = await fetch('/api/dashboard/stats');
       const { data } = await response.json();
 
-      document.getElementById('stat-total').textContent = data.total;
+      // CRÍTICO: Mostrar uniqueLeads (teléfonos únicos) en lugar de total (conversaciones totales)
+      // Esto debe coincidir con el conteo de la pestaña Chat que agrupa por teléfono
+      document.getElementById('stat-total').textContent = data.funnel.uniqueLeads;
       document.getElementById('stat-hot').textContent = data.leads.hot;
       document.getElementById('stat-scheduled').textContent = data.scheduled;
       document.getElementById('stat-conversion').textContent = `${data.last7Days.conversionRate}%`;
