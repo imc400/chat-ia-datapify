@@ -60,23 +60,10 @@ class CalendarSyncJob {
       const pendingConversations = await prisma.conversation.findMany({
         where: {
           OR: [
-            {
-              outcome: 'pending',
-              scheduledMeeting: false,
-            },
-            {
-              outcome: 'pending',
-              scheduledMeeting: null,
-            },
-            {
-              outcome: 'link_sent',
-              scheduledMeeting: false,
-            },
-            {
-              outcome: 'link_sent',
-              scheduledMeeting: null,
-            },
+            { outcome: 'pending' },
+            { outcome: 'link_sent' },
           ],
+          scheduledMeeting: false,
           // Solo sincronizar conversaciones de las últimas 48 horas
           updatedAt: {
             gte: new Date(Date.now() - 48 * 60 * 60 * 1000),
