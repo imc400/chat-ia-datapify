@@ -917,6 +917,7 @@ class DashboardApp {
             <th>Sitio Web</th>
             <th>Shopify</th>
             <th>Estado</th>
+            <th>Outcome</th>
             <th>Agendado</th>
             <th>Score</th>
             <th>Acciones</th>
@@ -933,6 +934,7 @@ class DashboardApp {
               <td>
                 ${this.renderConversionStatusBadge(lead.conversionStatus)}
               </td>
+              <td>${this.renderOutcomeBadge(lead.outcome)}</td>
               <td>${lead.scheduledMeeting ? `Sí (${lead.calendarEventCount})` : 'No'}</td>
               <td>${lead.leadScore}/10</td>
               <td>
@@ -965,6 +967,17 @@ class DashboardApp {
       none: '<span class="status-badge none">Sin conversión</span>',
     };
     return badges[status] || badges.none;
+  }
+
+  renderOutcomeBadge(outcome) {
+    const badges = {
+      link_sent: '<span class="outcome-badge link-sent">🔗 Link Enviado</span>',
+      scheduled: '<span class="outcome-badge scheduled">📅 Agendado</span>',
+      disqualified: '<span class="outcome-badge disqualified">❌ Descalificado</span>',
+      abandoned: '<span class="outcome-badge abandoned">👻 Abandonado</span>',
+      pending: '<span class="outcome-badge pending">⏳ Calificando</span>',
+    };
+    return badges[outcome] || '<span class="outcome-badge none">-</span>';
   }
 
   showConversionStatusModal(phone, currentStatus) {
