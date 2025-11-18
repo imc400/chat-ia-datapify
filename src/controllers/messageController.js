@@ -471,9 +471,11 @@ class MessageController {
         userText.includes('con shopify') ||
         userText.includes('mi shopify') ||
         userText.includes('en shopify') ||
-        // ELIMINADA la condición amplia: (allText.includes('shopify') && (allText.includes('sí') || allText.includes('si')))
-        // Era demasiado permisiva y generaba falsos positivos
-        (userText.includes('shopify') && userText.includes('tienda'))
+        (userText.includes('shopify') && userText.includes('tienda')) ||
+        // NUEVO: Detectar respuesta directa "Shopify" o "shopify" como única palabra
+        /^shopify$/i.test(userText.trim()) ||
+        // Detectar "Shopify" al inicio o fin de una frase corta (respuesta directa)
+        (userText.length < 30 && userText.includes('shopify'))
       ) {
         leadData.hasShopify = true;
       }
