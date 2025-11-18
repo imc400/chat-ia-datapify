@@ -15,20 +15,21 @@ datasource db {
 // ========================================
 
 model Conversation {
-  id                String   @id @default(uuid())
-  phone             String   // WhatsApp del usuario
-  leadDataId        String?  // ⭐ NUEVO: Foreign key al LeadData compartido
-  openaiThreadId    String?  // ⭐ NUEVO: Thread ID de OpenAI Assistant API
-  startedAt         DateTime @default(now())
-  endedAt           DateTime?
-  status            String   @default("active") // 'active', 'completed', 'abandoned'
-  outcome           String?  // 'scheduled', 'disqualified', 'abandoned', 'pending'
-  leadTemperature   String   @default("cold") // 'hot', 'warm', 'cold'
-  leadScore         Int      @default(0) // 0-10
-  scheduledMeeting  Boolean  @default(false)
-  lastReadAt        DateTime? // Última vez que el agente leyó esta conversación en el dashboard
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  phone                 String   // WhatsApp del usuario
+  leadDataId            String?  // ⭐ NUEVO: Foreign key al LeadData compartido
+  openaiThreadId        String?  // ⭐ Thread ID del Sales Assistant
+  taggerThreadId        String?  // ⭐ Thread ID del Data Tagger Assistant (separado)
+  startedAt             DateTime @default(now())
+  endedAt               DateTime?
+  status                String   @default("active") // 'active', 'completed', 'abandoned'
+  outcome               String?  // 'scheduled', 'disqualified', 'abandoned', 'pending'
+  leadTemperature       String   @default("cold") // 'hot', 'warm', 'cold'
+  leadScore             Int      @default(0) // 0-10
+  scheduledMeeting      Boolean  @default(false)
+  lastReadAt            DateTime? // Última vez que el agente leyó esta conversación en el dashboard
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   // Relaciones
   messages          Message[]

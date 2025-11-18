@@ -432,27 +432,29 @@ class DataTaggerService {
   }
 
   /**
-   * Obtiene o crea thread para el Tagger (separado del Sales thread)
+   * Obtiene o crea thread para el Tagger (SEPARADO del Sales thread)
    */
   async getOrCreateTaggerThread(conversationId) {
     try {
       // Buscar si ya existe un thread de tagger para esta conversación
-      // Por ahora usamos el mismo thread que Sales, pero podrías crear uno separado
       const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
-        select: { openaiThreadId: true },
+        select: { taggerThreadId: true },
       });
 
-      if (conversation?.openaiThreadId) {
-        return conversation.openaiThreadId;
+      if (conversation?.taggerThreadId) {
+        logger.debug('♻️ Reutilizando taggerThreadId existente:', conversation.taggerThreadId);
+        return conversation.taggerThreadId;
       }
 
-      // Si no existe, crear uno nuevo
+      // Si no existe, crear uno nuevo para el Data Tagger
       const thread = await this.openai.beta.threads.create();
+
+      logger.info('🆕 Creando nuevo taggerThreadId:', thread.id);
 
       await prisma.conversation.update({
         where: { id: conversationId },
-        data: { openaiThreadId: thread.id },
+        data: { taggerThreadId: thread.id },
       });
 
       return thread.id;
