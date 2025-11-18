@@ -62,7 +62,8 @@ class MessageController {
         shopifyConfidence: thinkingAnalysis.shopify.confidence,
         painLevel: thinkingAnalysis.pain.level,
         intent: thinkingAnalysis.intent.primary,
-        recommendation: thinkingAnalysis.recommendation.action,
+        isResumingAfterGap: thinkingAnalysis.temporal.isResumingAfterGap,
+        timeSinceLastMessage: thinkingAnalysis.temporal.humanReadableGap,
       });
 
       // 5. GUARDAR DATOS DETECTADOS EN TIEMPO REAL (ANTES de responder)
