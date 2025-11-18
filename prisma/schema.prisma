@@ -96,6 +96,9 @@ model LeadData {
   // FASE 2: Memoria persistente entre conversaciones
   conversationSummary   String?  @db.Text // Resumen de conversaciones previas para contexto
 
+  // NUEVO: Control de spam - tracking de mensajes manuales
+  lastManualMessageAt   DateTime? // Última vez que se envió mensaje manual a este lead
+
   extractedAt           DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

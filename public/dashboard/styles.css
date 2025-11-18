@@ -1803,6 +1803,27 @@ body {
   color: #dc2626;
 }
 
+.last-message-indicator {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #6b7280;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.last-message-indicator.recent-danger {
+  background: #fee2e2;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.last-message-indicator.recent-warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 .empty-recipients {
   padding: 40px;
   text-align: center;
@@ -2039,6 +2060,11 @@ body {
   color: #065f46;
 }
 
+.status-badge.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 .status-badge.warning {
   background: #fef3c7;
   color: #92400e;
@@ -2157,6 +2183,11 @@ body {
 .campaign-stat-card.success {
   background: #ecfdf5;
   border-color: #10b981;
+}
+
+.campaign-stat-card.info {
+  background: #eff6ff;
+  border-color: #3b82f6;
 }
 
 .campaign-stat-card.error {

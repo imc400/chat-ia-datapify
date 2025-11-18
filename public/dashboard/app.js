@@ -1320,24 +1320,59 @@ class DashboardApp {
       return;
     }
 
-    container.innerHTML = recipients.map(recipient => `
-      <div class="recipient-item">
-        <input
-          type="checkbox"
-          class="recipient-checkbox"
-          data-phone="${recipient.phone}"
-        >
-        <div class="recipient-info">
-          <span class="recipient-phone">${this.formatPhone(recipient.phone)}</span>
-          <span class="recipient-name">${recipient.name}</span>
-          <div class="recipient-badges">
-            ${recipient.hasShopify ? '<span class="recipient-badge shopify">Shopify</span>' : ''}
-            ${recipient.scheduledMeeting ? '<span class="recipient-badge scheduled">Agendado</span>' : ''}
-            ${recipient.leadScore >= 8 ? '<span class="recipient-badge hot">Hot</span>' : ''}
+    container.innerHTML = recipients.map(recipient => {
+      // Calcular tiempo desde último mensaje manual
+      let lastMessageIndicator = '';
+      if (recipient.lastManualMessageAt) {
+        const now = new Date();
+        const lastMsgDate = new Date(recipient.lastManualMessageAt);
+        const diffMs = now - lastMsgDate;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        let timeText = '';
+        let warningClass = '';
+
+        if (diffHours < 1) {
+          timeText = 'Hace menos de 1h';
+          warningClass = 'recent-danger';
+        } else if (diffHours < 24) {
+          timeText = `Hace ${diffHours}h`;
+          warningClass = 'recent-danger';
+        } else if (diffDays === 1) {
+          timeText = 'Hace 1 día';
+          warningClass = 'recent-warning';
+        } else if (diffDays < 7) {
+          timeText = `Hace ${diffDays} días`;
+          warningClass = 'recent-warning';
+        } else {
+          timeText = `Hace ${diffDays} días`;
+          warningClass = '';
+        }
+
+        lastMessageIndicator = `<span class="last-message-indicator ${warningClass}" title="Último mensaje manual: ${lastMsgDate.toLocaleString('es-CL')}">${timeText}</span>`;
+      }
+
+      return `
+        <div class="recipient-item">
+          <input
+            type="checkbox"
+            class="recipient-checkbox"
+            data-phone="${recipient.phone}"
+          >
+          <div class="recipient-info">
+            <span class="recipient-phone">${this.formatPhone(recipient.phone)}</span>
+            <span class="recipient-name">${recipient.name}</span>
+            <div class="recipient-badges">
+              ${recipient.hasShopify ? '<span class="recipient-badge shopify">Shopify</span>' : ''}
+              ${recipient.scheduledMeeting ? '<span class="recipient-badge scheduled">Agendado</span>' : ''}
+              ${recipient.leadScore >= 8 ? '<span class="recipient-badge hot">Hot</span>' : ''}
+              ${lastMessageIndicator}
+            </div>
           </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     // Event listeners para checkboxes
     container.querySelectorAll('.recipient-checkbox').forEach(checkbox => {
@@ -1616,6 +1651,14 @@ class DashboardApp {
       ? ((campaign.sentCount / campaign.totalRecipients) * 100).toFixed(1)
       : 0;
 
+    const deliveryRate = campaign.sentCount > 0
+      ? ((campaign.deliveredCount / campaign.sentCount) * 100).toFixed(1)
+      : 0;
+
+    const readRate = campaign.deliveredCount > 0
+      ? ((campaign.readCount / campaign.deliveredCount) * 100).toFixed(1)
+      : 0;
+
     modal.innerHTML = `
       <div class="campaign-detail-modal-content">
         <div class="campaign-detail-header">
@@ -1635,6 +1678,16 @@ class DashboardApp {
               <div class="stat-icon"><svg class="icon"><use href="#icon-check"/></svg></div>
               <div class="stat-value">${campaign.sentCount}</div>
               <div class="stat-label">Enviados</div>
+            </div>
+            <div class="campaign-stat-card info">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-phone"/></svg></div>
+              <div class="stat-value">${campaign.deliveredCount || 0}</div>
+              <div class="stat-label">Entregados (${deliveryRate}%)</div>
+            </div>
+            <div class="campaign-stat-card info">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-check"/></svg></div>
+              <div class="stat-value">${campaign.readCount || 0}</div>
+              <div class="stat-label">Leídos (${readRate}%)</div>
             </div>
             <div class="campaign-stat-card error">
               <div class="stat-icon"><svg class="icon"><use href="#icon-x"/></svg></div>
@@ -1684,11 +1737,18 @@ class DashboardApp {
                 </thead>
                 <tbody>
                   ${campaign.recipients.map(recipient => {
-                    const statusBadge = recipient.status === 'sent'
-                      ? '<span class="status-badge success">Enviado</span>'
-                      : recipient.status === 'failed'
-                      ? '<span class="status-badge error">Fallido</span>'
-                      : '<span class="status-badge">Pendiente</span>';
+                    let statusBadge = '';
+                    if (recipient.status === 'read') {
+                      statusBadge = '<span class="status-badge success">Leído</span>';
+                    } else if (recipient.status === 'delivered') {
+                      statusBadge = '<span class="status-badge info">Entregado</span>';
+                    } else if (recipient.status === 'sent') {
+                      statusBadge = '<span class="status-badge">Enviado</span>';
+                    } else if (recipient.status === 'failed') {
+                      statusBadge = '<span class="status-badge error">Fallido</span>';
+                    } else {
+                      statusBadge = '<span class="status-badge">Pendiente</span>';
+                    }
 
                     return `
                       <tr>

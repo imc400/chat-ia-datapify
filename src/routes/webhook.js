@@ -100,6 +100,82 @@ router.post('/', async (req, res) => {
               logger.info('📊 Estado de mensaje actualizado', {
                 messageId: status.id,
                 status: status.status,
+                recipient: status.recipient_id,
+              });
+
+              // Procesar el status update de forma asíncrona
+              const processStatusUpdate = async () => {
+                try {
+                  const { PrismaClient } = require('@prisma/client');
+                  const prisma = new PrismaClient();
+
+                  // Buscar el recipient por messageId
+                  const recipient = await prisma.campaignRecipient.findFirst({
+                    where: { messageId: status.id },
+                    include: { campaign: true },
+                  });
+
+                  if (!recipient) {
+                    logger.debug('No se encontró CampaignRecipient para este messageId', { messageId: status.id });
+                    await prisma.$disconnect();
+                    return;
+                  }
+
+                  // Actualizar según el status
+                  const updateData = {};
+
+                  if (status.status === 'delivered') {
+                    updateData.status = 'delivered';
+                    updateData.deliveredAt = new Date(status.timestamp * 1000);
+
+                    // Incrementar deliveredCount en la campaña
+                    await prisma.campaign.update({
+                      where: { id: recipient.campaignId },
+                      data: { deliveredCount: { increment: 1 } },
+                    });
+
+                    logger.info('✅ Mensaje marcado como entregado', {
+                      phone: recipient.phone,
+                      campaignId: recipient.campaignId,
+                      campaignName: recipient.campaign.name,
+                    });
+                  }
+                  else if (status.status === 'read') {
+                    updateData.status = 'read';
+                    updateData.readAt = new Date(status.timestamp * 1000);
+
+                    // Incrementar readCount en la campaña (solo si no estaba ya como read)
+                    if (recipient.status !== 'read') {
+                      await prisma.campaign.update({
+                        where: { id: recipient.campaignId },
+                        data: { readCount: { increment: 1 } },
+                      });
+                    }
+
+                    logger.info('👁️ Mensaje marcado como leído', {
+                      phone: recipient.phone,
+                      campaignId: recipient.campaignId,
+                      campaignName: recipient.campaign.name,
+                    });
+                  }
+
+                  // Actualizar el recipient
+                  if (Object.keys(updateData).length > 0) {
+                    await prisma.campaignRecipient.update({
+                      where: { id: recipient.id },
+                      data: updateData,
+                    });
+                  }
+
+                  await prisma.$disconnect();
+                } catch (err) {
+                  logger.error('Error procesando status update:', err);
+                }
+              };
+
+              // Ejecutar de forma asíncrona
+              processStatusUpdate().catch(err => {
+                logger.error('Error en processStatusUpdate:', err);
               });
             }
           }

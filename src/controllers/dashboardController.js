@@ -772,6 +772,7 @@ class DashboardController {
           outcome: latestConv?.outcome || null, // ⭐ NUEVO: Outcome de la conversación más reciente
           lastMessage: lastMsg,
           daysSinceLastMessage, // ⭐ NUEVO: Días desde el último mensaje
+          lastManualMessageAt: lead.lastManualMessageAt, // ⭐ NUEVO: Última vez que se envió mensaje manual
           conversationCount: lead.conversations.length,
           updatedAt: lead.updatedAt,
           createdAt: lead.extractedAt,
@@ -1253,6 +1254,17 @@ class DashboardController {
               status: 'sent',
               sentAt: new Date(),
               messageId: messageId,
+            },
+          });
+
+          // 6. Actualizar lastManualMessageAt en LeadData para control de spam
+          await prisma.leadData.upsert({
+            where: { phone: phone },
+            update: { lastManualMessageAt: new Date() },
+            create: {
+              phone: phone,
+              name: leadName,
+              lastManualMessageAt: new Date(),
             },
           });
 
