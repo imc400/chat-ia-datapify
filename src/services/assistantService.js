@@ -80,6 +80,12 @@ class AssistantService {
       });
 
       // 5. Esperar a que el Assistant termine
+      logger.info('📊 Llamando waitForRunCompletion', {
+        threadId,
+        runId: run.id,
+        threadIdType: typeof threadId,
+        runIdType: typeof run.id,
+      });
       const completedRun = await this.waitForRunCompletion(threadId, run.id);
 
       // 6. Obtener la respuesta del Assistant
@@ -175,6 +181,13 @@ class AssistantService {
   async waitForRunCompletion(threadId, runId, maxWaitTime = 30000) {
     const startTime = Date.now();
     const pollInterval = 500; // ms
+
+    logger.debug('🔍 waitForRunCompletion recibió', {
+      threadId,
+      runId,
+      threadIdType: typeof threadId,
+      runIdType: typeof runId,
+    });
 
     while (Date.now() - startTime < maxWaitTime) {
       const run = await this.openai.beta.threads.runs.retrieve(threadId, runId);
