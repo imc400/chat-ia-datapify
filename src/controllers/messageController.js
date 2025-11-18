@@ -150,79 +150,21 @@ class MessageController {
       // 9. ENVIAR RESPUESTA AL USUARIO
       await whatsappService.sendTextMessage(from, aiResponse);
 
-      // 10. LÓGICA DE AGENDAMIENTO MEJORADA
-      const userConfirms = this.userConfirmsScheduling(userMessage);
+      // 10. LÓGICA DE AGENDAMIENTO - DESACTIVADA
+      // El OpenAI Assistant ahora maneja 100% el flujo de agendamiento
+      // incluyendo cuándo y cómo enviar el link de Calendly
 
-      // Verificar si el agente mencionó agendar/reunión en mensajes recientes
-      const recentAssistantMessages = history
-        .filter(h => h.role === 'assistant' || h.role === 'asistente')
-        .slice(-3); // Últimos 3 mensajes del bot
+      // Si el Assistant incluye explícitamente el link de Calendly en su respuesta,
+      // se enviará automáticamente (ya está en aiResponse)
 
-      const agentAskedToSchedule = recentAssistantMessages.some(msg => {
-        const text = msg.content.toLowerCase();
-        return text.includes('agend') ||
-               text.includes('reuni') ||
-               text.includes('demo') ||
-               text.includes('llama') ||
-               text.includes('te tinca');
+      // NOTA: La lógica automática anterior causaba que se enviara el link
+      // prematuramente sin completar el método socrático de calificación.
+      // Ahora el Assistant controla todo el proceso.
+
+      logger.info('ℹ️ Agendamiento controlado por Assistant', {
+        conversationId: conversation.id,
+        responseIncludesCalendlyLink: aiResponse.includes('calendly.com'),
       });
-
-      // Frases que indican que el bot va a pasar el link
-      const agentConfirmedLink = aiResponse.toLowerCase().includes('te paso el link') ||
-                                 aiResponse.toLowerCase().includes('te envío el link') ||
-                                 aiResponse.toLowerCase().includes('te mando el link') ||
-                                 aiResponse.toLowerCase().includes('te enviaré el link') ||
-                                 aiResponse.toLowerCase().includes('para que elijas el día') ||
-                                 aiResponse.toLowerCase().includes('enlace al calendario');
-
-      // ENVIAR LINK SI:
-      // 1. Usuario confirmó Y bot había preguntado por agendar
-      // 2. O bot explícitamente dijo "te paso el link"
-
-      // CRÍTICO: Verificar si ya se envió el link antes (prevenir duplicados)
-      const linkAlreadySent = history.some(msg =>
-        msg.role === 'system' && msg.content.includes('Link de agendamiento enviado')
-      );
-
-      if (linkAlreadySent) {
-        logger.warn('⚠️ Link ya fue enviado previamente en esta conversación', {
-          conversationId: conversation.id,
-          phone: from
-        });
-      } else if ((agentAskedToSchedule && userConfirms) || agentConfirmedLink) {
-        // Construir memoria conversacional para personalizar mensaje
-        const memory = memoryService.buildConversationalMemory(history);
-
-        logger.info('📅 Enviando link de agendamiento', {
-          userConfirmed: userConfirms,
-          agentAsked: agentAskedToSchedule,
-          agentConfirmedLink: agentConfirmedLink,
-          painPoints: memory.painPoints,
-        });
-
-        await this.sendBookingLink(from, memory);
-
-        // Marcar conversación como pending (esperando agendamiento)
-        await conversationService.completeConversation(
-          conversation.id,
-          'pending', // pending hasta que job de sync confirme agendamiento
-          false
-        );
-
-        // Agregar mensaje del sistema para tracking
-        await conversationService.saveMessage(
-          conversation.id,
-          'system',
-          `📅 Link de agendamiento enviado. URL: ${config.googleCalendar.bookingLink}`,
-          null,
-          0
-        );
-
-        logger.info('✅ Link enviado y conversación marcada como pending', {
-          conversationId: conversation.id,
-          phone: from,
-        });
-      }
 
       // 🧠 NOTA: La extracción de datos ahora ocurre ANTES de responder
       // mediante el Thinking Engine (líneas 51-95)
