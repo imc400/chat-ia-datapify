@@ -1,5 +1,6 @@
 const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/openaiService');
+const assistantService = require('../services/assistantService'); // 🤖 NUEVO: OpenAI Assistant
 const conversationService = require('../services/conversationService');
 const calendarService = require('../services/calendarService');
 const memoryService = require('../services/memoryService');
@@ -104,13 +105,28 @@ class MessageController {
         phase: leadScore.phase,
       });
 
-      // 7. GENERAR RESPUESTA CON IA (CON CONTEXTO DEL THINKING ENGINE)
-      const aiResponse = await aiService.generateResponseWithThinking(
-        userMessage,
-        history,
-        thinkingAnalysis, // 🧠 NUEVO: Incluye análisis profundo
-        leadScore
-      );
+      // 7. GENERAR RESPUESTA CON OPENAI ASSISTANT
+      // Intenta usar Assistant API, fallback a chat completions si falla
+      let aiResponse;
+      try {
+        aiResponse = await assistantService.generateResponse(
+          userMessage,
+          conversation.id,
+          thinkingAnalysis // Opcional: pasa contexto del Thinking Engine
+        );
+        logger.info('✅ Respuesta generada con OpenAI Assistant');
+      } catch (error) {
+        logger.warn('⚠️ Error con Assistant API, usando fallback a chat completions', {
+          error: error.message,
+        });
+        // Fallback al método anterior
+        aiResponse = await aiService.generateResponseWithThinking(
+          userMessage,
+          history,
+          thinkingAnalysis,
+          leadScore
+        );
+      }
 
       const responseTime = Date.now() - startTime;
 

@@ -18,6 +18,7 @@ model Conversation {
   id                String   @id @default(uuid())
   phone             String   // WhatsApp del usuario
   leadDataId        String?  // ⭐ NUEVO: Foreign key al LeadData compartido
+  openaiThreadId    String?  // ⭐ NUEVO: Thread ID de OpenAI Assistant API
   startedAt         DateTime @default(now())
   endedAt           DateTime?
   status            String   @default("active") // 'active', 'completed', 'abandoned'
