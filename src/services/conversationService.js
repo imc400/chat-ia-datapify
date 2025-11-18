@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db/prisma');
 const logger = require('../utils/logger');
-
-const prisma = new PrismaClient();
 
 /**
  * ConversationService - Persiste TODA la información de conversaciones
@@ -409,9 +407,13 @@ class ConversationService {
 
   /**
    * Cierra conexión de Prisma (para testing)
+   * NOTA: Con el singleton, la desconexión se maneja automáticamente
+   * en src/db/prisma.js durante el shutdown del proceso
    */
   async disconnect() {
-    await prisma.$disconnect();
+    // Ya no es necesario desconectar manualmente
+    // El singleton maneja esto en process.on('beforeExit')
+    logger.info('ℹ️ disconnect() llamado - el singleton maneja la desconexión automáticamente');
   }
 }
 

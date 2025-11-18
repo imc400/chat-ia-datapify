@@ -1,10 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db/prisma');
 const learningService = require('../services/learningService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/analytics/dashboard

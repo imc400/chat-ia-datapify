@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db/prisma');
 const calendarService = require('../services/calendarService');
 const logger = require('../utils/logger');
-
-const prisma = new PrismaClient();
 
 /**
  * Job de sincronización bidireccional Calendario <-> CRM

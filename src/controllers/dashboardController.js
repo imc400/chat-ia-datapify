@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db/prisma');
 const logger = require('../utils/logger');
 const calendarService = require('../services/calendarService');
-
-const prisma = new PrismaClient();
 
 /**
  * Helper para convertir BigInt a String en objetos JSON

@@ -106,8 +106,7 @@ router.post('/', async (req, res) => {
               // Procesar el status update de forma asíncrona
               const processStatusUpdate = async () => {
                 try {
-                  const { PrismaClient } = require('@prisma/client');
-                  const prisma = new PrismaClient();
+                  const prisma = require('../../db/prisma');
 
                   // Buscar el recipient por messageId
                   const recipient = await prisma.campaignRecipient.findFirst({
@@ -117,7 +116,6 @@ router.post('/', async (req, res) => {
 
                   if (!recipient) {
                     logger.debug('No se encontró CampaignRecipient para este messageId', { messageId: status.id });
-                    await prisma.$disconnect();
                     return;
                   }
 
@@ -166,8 +164,6 @@ router.post('/', async (req, res) => {
                       data: updateData,
                     });
                   }
-
-                  await prisma.$disconnect();
                 } catch (err) {
                   logger.error('Error procesando status update:', err);
                 }

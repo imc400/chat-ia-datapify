@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db/prisma');
 const logger = require('../utils/logger');
-
-const prisma = new PrismaClient();
 
 /**
  * LearningService - IA que APRENDE automáticamente
