@@ -449,8 +449,24 @@ class MessageController {
         }
       }
 
-      // Detectar Shopify (solo si el USUARIO lo menciona explícitamente)
-      // Primero verificar si menciona otras plataformas (debería ser false)
+      // ========================================
+      // DETECCIÓN ROBUSTA DE SHOPIFY
+      // Sistema de 3 capas con múltiples estrategias
+      // ========================================
+
+      // PASO 1: Normalizar texto (eliminar tildes, lowercase, trim)
+      const normalizeText = (text) => {
+        return text
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Eliminar tildes
+          .trim();
+      };
+
+      const normalizedText = normalizeText(userText);
+      const words = normalizedText.split(/\s+/); // Separar por espacios
+
+      // PASO 2: Verificar plataformas competidoras (descarta Shopify)
       const otherPlatforms = [
         'woocommerce',
         'woo commerce',
@@ -460,24 +476,77 @@ class MessageController {
         'jumpseller',
         'tienda nube',
         'mercado shops',
+        'mercadoshops',
+        'wordpress',
       ];
 
-      if (otherPlatforms.some(platform => userText.includes(platform))) {
+      const hasOtherPlatform = otherPlatforms.some(platform =>
+        normalizedText.includes(platform)
+      );
+
+      if (hasOtherPlatform) {
         leadData.hasShopify = false;
-      } else if (
-        userText.includes('tengo shopify') ||
-        userText.includes('uso shopify') ||
-        userText.includes('mi tienda es shopify') ||
-        userText.includes('con shopify') ||
-        userText.includes('mi shopify') ||
-        userText.includes('en shopify') ||
-        (userText.includes('shopify') && userText.includes('tienda')) ||
-        // NUEVO: Detectar respuesta directa "Shopify" o "shopify" como única palabra
-        /^shopify$/i.test(userText.trim()) ||
-        // Detectar "Shopify" al inicio o fin de una frase corta (respuesta directa)
-        (userText.length < 30 && userText.includes('shopify'))
-      ) {
-        leadData.hasShopify = true;
+        logger.info('🔍 Plataforma competidora detectada, marcando hasShopify=false', {
+          phone: conversation.phone,
+          text: userText.substring(0, 100)
+        });
+      }
+      // PASO 3: Detección de Shopify con múltiples estrategias
+      else if (normalizedText.includes('shopify')) {
+        let isShopify = false;
+        let detectionMethod = '';
+
+        // Estrategia 1: Palabra única "shopify" o "Shopify"
+        if (words.length === 1 && words[0] === 'shopify') {
+          isShopify = true;
+          detectionMethod = 'palabra_unica';
+        }
+        // Estrategia 2: Respuesta corta con shopify (máximo 5 palabras)
+        else if (words.length <= 5 && words.includes('shopify')) {
+          isShopify = true;
+          detectionMethod = 'respuesta_corta';
+        }
+        // Estrategia 3: Frases confirmativas con shopify
+        else if (
+          normalizedText.includes('tengo shopify') ||
+          normalizedText.includes('uso shopify') ||
+          normalizedText.includes('con shopify') ||
+          normalizedText.includes('en shopify') ||
+          normalizedText.includes('mi shopify') ||
+          normalizedText.includes('tienda shopify') ||
+          normalizedText.includes('tienda en shopify') ||
+          normalizedText.includes('tienda es shopify') ||
+          normalizedText.match(/\bsi\b.*shopify/i) || // "si shopify", "sí, shopify"
+          normalizedText.match(/shopify.*\bsi\b/i) || // "shopify sí"
+          normalizedText.includes('esta en shopify') ||
+          normalizedText.includes('esta con shopify')
+        ) {
+          isShopify = true;
+          detectionMethod = 'frase_confirmativa';
+        }
+        // Estrategia 4: Shopify mencionado sin negación
+        else if (
+          normalizedText.includes('shopify') &&
+          !normalizedText.includes('no uso') &&
+          !normalizedText.includes('no tengo') &&
+          !normalizedText.includes('no es') &&
+          !normalizedText.includes('sin shopify') &&
+          !normalizedText.includes('no shopify') &&
+          words.length <= 15 // Respuestas relativamente cortas
+        ) {
+          isShopify = true;
+          detectionMethod = 'mencion_sin_negacion';
+        }
+
+        if (isShopify) {
+          leadData.hasShopify = true;
+          logger.info('✅ SHOPIFY DETECTADO', {
+            phone: conversation.phone,
+            method: detectionMethod,
+            text: userText.substring(0, 100),
+            wordCount: words.length
+          });
+        }
       }
 
       // Detectar inversión en publicidad (solo si el USUARIO lo menciona)
