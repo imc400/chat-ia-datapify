@@ -162,8 +162,8 @@ class DashboardApp {
             ${this.renderMessagePreview(conv.lastMessage)}
           </div>
           <div class="conversation-meta">
-            ${conv.leadData?.hasShopify ? '<span class="lead-badge shopify">🛍️ Shopify</span>' : ''}
-            ${conv.scheduledMeeting ? `<span class="meeting-badge">📅 Agendado${conv.calendarEventCount > 1 ? ` (${conv.calendarEventCount})` : ''}</span>` : ''}
+            ${conv.leadData?.hasShopify ? '<span class="lead-badge shopify">Shopify</span>' : ''}
+            ${conv.scheduledMeeting ? `<span class="meeting-badge">Agendado${conv.calendarEventCount > 1 ? ` (${conv.calendarEventCount})` : ''}</span>` : ''}
             ${conv.conversationCount > 1 ? `<span class="conversation-count-badge">${conv.conversationCount} conversaciones</span>` : ''}
           </div>
         </div>
@@ -364,7 +364,7 @@ class DashboardApp {
     container.innerHTML = `
       <div class="info-panel-toggle" id="info-toggle">
         <div class="info-panel-toggle-text">
-          📋 Información del Lead
+          Información del Lead
         </div>
         <div class="info-panel-toggle-icon">▼</div>
       </div>
@@ -392,7 +392,7 @@ class DashboardApp {
           ` : ''}
           <div class="info-item">
             <span class="info-label">Origen:</span>
-            <span class="info-value">${calendarData.source === 'whatsapp_bot' ? '💬 WhatsApp Bot' : calendarData.source === 'google_appointment' ? '📅 Google Appointment' : '✏️ Manual'}</span>
+            <span class="info-value">${calendarData.source === 'whatsapp_bot' ? 'WhatsApp Bot' : calendarData.source === 'google_appointment' ? 'Google Appointment' : 'Manual'}</span>
           </div>
         </div>
         ` : ''}
@@ -409,11 +409,11 @@ class DashboardApp {
         </div>
         <div class="info-item">
           <span class="info-label">Tiene Shopify:</span>
-          <span class="info-value">${leadData.hasShopify === true ? '✅ Sí' : leadData.hasShopify === false ? '❌ No' : '❓ Desconocido'}</span>
+          <span class="info-value">${leadData.hasShopify === true ? 'Sí' : leadData.hasShopify === false ? 'No' : 'Desconocido'}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Invierte en Ads:</span>
-          <span class="info-value">${leadData.investsInAds ? '✅ Sí' : '❌ No'}</span>
+          <span class="info-value">${leadData.investsInAds ? 'Sí' : 'No'}</span>
         </div>
       </div>
 
@@ -433,7 +433,7 @@ class DashboardApp {
         </div>
         <div class="info-item">
           <span class="info-label">Reunión agendada:</span>
-          <span class="info-value">${summary.hasScheduledMeeting ? '✅ Sí' : '❌ No'}</span>
+          <span class="info-value">${summary.hasScheduledMeeting ? 'Sí' : 'No'}</span>
         </div>
       </div>
 
@@ -526,7 +526,7 @@ class DashboardApp {
     container.innerHTML = `
       <div class="info-panel-toggle" id="info-toggle">
         <div class="info-panel-toggle-text">
-          📋 Información del Lead
+          Información del Lead
         </div>
         <div class="info-panel-toggle-icon">▼</div>
       </div>
@@ -543,11 +543,11 @@ class DashboardApp {
         </div>
         <div class="info-item">
           <span class="info-label">Tiene Shopify:</span>
-          <span class="info-value">${leadData.hasShopify === true ? '✅ Sí' : leadData.hasShopify === false ? '❌ No' : '❓ Desconocido'}</span>
+          <span class="info-value">${leadData.hasShopify === true ? 'Sí' : leadData.hasShopify === false ? 'No' : 'Desconocido'}</span>
         </div>
         <div class="info-item">
           <span class="info-label">Invierte en Ads:</span>
-          <span class="info-value">${leadData.investsInAds ? '✅ Sí' : '❌ No'}</span>
+          <span class="info-value">${leadData.investsInAds ? 'Sí' : 'No'}</span>
         </div>
       </div>
 
@@ -663,9 +663,9 @@ class DashboardApp {
 
   formatTemperature(temp) {
     const map = {
-      hot: '🔥 Hot',
-      warm: '🟡 Warm',
-      cold: '❄️ Cold',
+      hot: 'Hot',
+      warm: 'Warm',
+      cold: 'Cold',
     };
     return map[temp] || temp;
   }
@@ -681,10 +681,10 @@ class DashboardApp {
 
   formatOutcome(outcome) {
     const map = {
-      scheduled: '✅ Reunión agendada',
-      disqualified: '❌ Descalificado',
-      abandoned: '⏸️ Abandonado',
-      pending: '⏳ Pendiente',
+      scheduled: 'Reunión agendada',
+      disqualified: 'Descalificado',
+      abandoned: 'Abandonado',
+      pending: 'Pendiente',
     };
     return map[outcome] || outcome || 'N/A';
   }
@@ -846,49 +846,49 @@ class DashboardApp {
 
     container.innerHTML = `
       <div class="stat-card">
-        <div class="stat-icon">👥</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Total Leads</div>
           <div class="stat-value">${stats.totalLeads}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🎯</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-campaigns"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Con Shopify</div>
           <div class="stat-value">${stats.metrics.withShopify}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">📅</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-funnel"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Agendados</div>
           <div class="stat-value">${stats.metrics.scheduled}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">💰</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-trending-up"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Pagaron</div>
           <div class="stat-value">${stats.metrics.totalPaid}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">📊</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-analytics"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Tasa de Conversión</div>
           <div class="stat-value">${stats.metrics.conversionRate}%</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🔄</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-refresh"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Trial 14 días</div>
           <div class="stat-value">${stats.byStatus.trial_14_days || 0}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">❌</div>
+        <div class="stat-icon"><svg class="icon"><use href="#icon-x"/></svg></div>
         <div class="stat-details">
           <div class="stat-label">Trial sin conversión</div>
           <div class="stat-value">${stats.byStatus.trial_completed_no_payment || 0}</div>
@@ -928,11 +928,11 @@ class DashboardApp {
               <td>${lead.name || '-'} ${lead.lastName || ''}</td>
               <td>${lead.email || '-'}</td>
               <td>${lead.website ? `<a href="${lead.website}" target="_blank">${lead.website}</a>` : '-'}</td>
-              <td>${lead.hasShopify ? '✅' : '❌'}</td>
+              <td>${lead.hasShopify ? 'Sí' : 'No'}</td>
               <td>
                 ${this.renderConversionStatusBadge(lead.conversionStatus)}
               </td>
-              <td>${lead.scheduledMeeting ? `✅ (${lead.calendarEventCount})` : '❌'}</td>
+              <td>${lead.scheduledMeeting ? `Sí (${lead.calendarEventCount})` : 'No'}</td>
               <td>${lead.leadScore}/10</td>
               <td>
                 <button class="btn-change-status" data-phone="${lead.phone}" data-status="${lead.conversionStatus || 'none'}">
@@ -957,10 +957,10 @@ class DashboardApp {
 
   renderConversionStatusBadge(status) {
     const badges = {
-      trial_14_days: '<span class="status-badge trial">🔄 Trial 14d</span>',
-      trial_completed_no_payment: '<span class="status-badge churn">❌ Trial sin pago</span>',
-      paid_monthly_bonus: '<span class="status-badge paid">💰 Mensual + Bonos</span>',
-      paid_after_trial: '<span class="status-badge paid">✅ Pagó post-trial</span>',
+      trial_14_days: '<span class="status-badge trial">Trial 14d</span>',
+      trial_completed_no_payment: '<span class="status-badge churn">Trial sin pago</span>',
+      paid_monthly_bonus: '<span class="status-badge paid">Mensual + Bonos</span>',
+      paid_after_trial: '<span class="status-badge paid">Pagó post-trial</span>',
       none: '<span class="status-badge none">Sin conversión</span>',
     };
     return badges[status] || badges.none;
@@ -982,10 +982,10 @@ class DashboardApp {
           <label for="conversion-status">Nuevo estado:</label>
           <select id="conversion-status" class="form-select">
             <option value="none" ${currentStatus === 'none' ? 'selected' : ''}>Sin conversión</option>
-            <option value="trial_14_days" ${currentStatus === 'trial_14_days' ? 'selected' : ''}>🔄 Empezó 14 días gratis</option>
-            <option value="trial_completed_no_payment" ${currentStatus === 'trial_completed_no_payment' ? 'selected' : ''}>❌ NO contrató post-trial (churn)</option>
-            <option value="paid_monthly_bonus" ${currentStatus === 'paid_monthly_bonus' ? 'selected' : ''}>💰 Pagó mensual con bonos</option>
-            <option value="paid_after_trial" ${currentStatus === 'paid_after_trial' ? 'selected' : ''}>✅ Contrató después de trial</option>
+            <option value="trial_14_days" ${currentStatus === 'trial_14_days' ? 'selected' : ''}>Empezó 14 días gratis</option>
+            <option value="trial_completed_no_payment" ${currentStatus === 'trial_completed_no_payment' ? 'selected' : ''}>NO contrató post-trial (churn)</option>
+            <option value="paid_monthly_bonus" ${currentStatus === 'paid_monthly_bonus' ? 'selected' : ''}>Pagó mensual con bonos</option>
+            <option value="paid_after_trial" ${currentStatus === 'paid_after_trial' ? 'selected' : ''}>Contrató después de trial</option>
           </select>
 
           <label for="conversion-notes">Notas (opcional):</label>
@@ -1027,14 +1027,14 @@ class DashboardApp {
       const { success, data } = await response.json();
 
       if (success) {
-        alert('✅ Estado actualizado correctamente');
+        alert('Estado actualizado correctamente');
         this.loadLeadsPage(); // Recargar la tabla
       } else {
         throw new Error('Error actualizando estado');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('❌ Error actualizando estado');
+      alert('Error actualizando estado');
     }
   }
 
@@ -1106,7 +1106,7 @@ class DashboardApp {
     modal.innerHTML = `
       <div class="mass-message-modal-content">
         <div class="mass-message-modal-header">
-          <h3>📤 Enviar Mensaje Masivo</h3>
+          <h3>Enviar Mensaje Masivo</h3>
           <button class="mass-message-modal-close">&times;</button>
         </div>
         <div class="mass-message-modal-body">
@@ -1142,7 +1142,7 @@ class DashboardApp {
 
           <!-- Filtros -->
           <div class="filter-section">
-            <h4>🎯 Filtrar destinatarios</h4>
+            <h4>Filtrar destinatarios</h4>
             <div class="filter-grid">
               <div class="filter-item">
                 <label>Shopify</label>
@@ -1173,34 +1173,34 @@ class DashboardApp {
                 <label>Temperatura</label>
                 <select id="modal-filter-temperature">
                   <option value="all">Todas</option>
-                  <option value="hot">Hot (🔥)</option>
-                  <option value="warm">Warm (🟡)</option>
-                  <option value="cold">Cold (❄️)</option>
+                  <option value="hot">Hot</option>
+                  <option value="warm">Warm</option>
+                  <option value="cold">Cold</option>
                 </select>
               </div>
               <div class="filter-item">
                 <label>Actividad</label>
                 <select id="modal-filter-response">
                   <option value="all">Todos</option>
-                  <option value="no-response">🔇 Sin respuesta</option>
-                  <option value="active">💬 Activos</option>
+                  <option value="no-response">Sin respuesta</option>
+                  <option value="active">Activos</option>
                 </select>
               </div>
             </div>
             <div style="margin-top: 12px;">
-              <button id="btn-apply-filters" class="btn-secondary">🔍 Aplicar Filtros</button>
+              <button id="btn-apply-filters" class="btn-secondary">Aplicar Filtros</button>
             </div>
           </div>
 
           <!-- Preview de destinatarios -->
           <div class="preview-section">
             <div class="preview-header">
-              <h4>📋 Destinatarios</h4>
+              <h4>Destinatarios</h4>
               <span class="preview-count zero" id="preview-count">0 seleccionados</span>
             </div>
             <div class="recipients-list" id="recipients-list">
               <div class="empty-recipients">
-                <div class="empty-recipients-icon">👥</div>
+                <div class="empty-recipients-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
                 <p>Haz clic en "Aplicar Filtros" para ver los destinatarios</p>
               </div>
             </div>
@@ -1312,7 +1312,7 @@ class DashboardApp {
     if (recipients.length === 0) {
       container.innerHTML = `
         <div class="empty-recipients">
-          <div class="empty-recipients-icon">🔍</div>
+          <div class="empty-recipients-icon"><svg class="icon"><use href="#icon-search"/></svg></div>
           <p>No se encontraron destinatarios con estos filtros</p>
         </div>
       `;
@@ -1331,9 +1331,9 @@ class DashboardApp {
           <span class="recipient-phone">${this.formatPhone(recipient.phone)}</span>
           <span class="recipient-name">${recipient.name}</span>
           <div class="recipient-badges">
-            ${recipient.hasShopify ? '<span class="recipient-badge shopify">🛍️ Shopify</span>' : ''}
-            ${recipient.scheduledMeeting ? '<span class="recipient-badge scheduled">📅 Agendado</span>' : ''}
-            ${recipient.leadScore >= 8 ? '<span class="recipient-badge hot">🔥 Hot</span>' : ''}
+            ${recipient.hasShopify ? '<span class="recipient-badge shopify">Shopify</span>' : ''}
+            ${recipient.scheduledMeeting ? '<span class="recipient-badge scheduled">Agendado</span>' : ''}
+            ${recipient.leadScore >= 8 ? '<span class="recipient-badge hot">Hot</span>' : ''}
           </div>
         </div>
       </div>
@@ -1436,7 +1436,7 @@ class DashboardApp {
         const statusDiv = document.getElementById('message-status');
         statusDiv.innerHTML = `
           <div class="success-message">
-            <span class="success-message-icon">✅</span>
+            <span class="success-message-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
             <div>
               <strong>Campaña "${result.data.campaignName}" creada correctamente</strong><br>
               <small>${result.data.summary.sent} enviados, ${result.data.summary.failed} fallidos (${result.data.summary.successRate}% éxito)</small><br>
@@ -1465,7 +1465,7 @@ class DashboardApp {
       const statusDiv = document.getElementById('message-status');
       statusDiv.innerHTML = `
         <div class="error-message">
-          <span>❌</span>
+          <span><svg class="icon"><use href="#icon-x"/></svg></span>
           <div>
             <strong>Error enviando mensajes</strong><br>
             <small>${error.message}</small>
@@ -1497,7 +1497,7 @@ class DashboardApp {
       console.error('Error cargando campañas:', error);
       document.getElementById('campaigns-table').innerHTML = `
         <div class="error-message">
-          <span>❌</span>
+          <span><svg class="icon"><use href="#icon-x"/></svg></span>
           <div>
             <strong>Error cargando campañas</strong><br>
             <small>${error.message}</small>
@@ -1513,7 +1513,7 @@ class DashboardApp {
     if (campaigns.length === 0) {
       container.innerHTML = `
         <div class="empty-campaigns">
-          <div class="empty-campaigns-icon">📭</div>
+          <div class="empty-campaigns-icon"><svg class="icon"><use href="#icon-campaigns"/></svg></div>
           <h3>No hay campañas todavía</h3>
           <p>Crea tu primera campaña enviando un mensaje masivo desde la sección de Leads</p>
           <button class="btn-primary" onclick="app.navigateTo('leads')">
@@ -1545,10 +1545,10 @@ class DashboardApp {
               : 0;
 
             const statusBadge = campaign.status === 'completed'
-              ? '<span class="status-badge success">✅ Completada</span>'
+              ? '<span class="status-badge success">Completada</span>'
               : campaign.status === 'sending'
-              ? '<span class="status-badge warning">⏳ Enviando</span>'
-              : '<span class="status-badge error">❌ Error</span>';
+              ? '<span class="status-badge warning">Enviando</span>'
+              : '<span class="status-badge error">Error</span>';
 
             return `
               <tr>
@@ -1619,7 +1619,7 @@ class DashboardApp {
     modal.innerHTML = `
       <div class="campaign-detail-modal-content">
         <div class="campaign-detail-header">
-          <h3>📊 ${campaign.name}</h3>
+          <h3>${campaign.name}</h3>
           <button class="campaign-detail-close">&times;</button>
         </div>
 
@@ -1627,22 +1627,22 @@ class DashboardApp {
           <!-- Stats -->
           <div class="campaign-stats-grid">
             <div class="campaign-stat-card">
-              <div class="stat-icon">👥</div>
+              <div class="stat-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
               <div class="stat-value">${campaign.totalRecipients}</div>
               <div class="stat-label">Total Destinatarios</div>
             </div>
             <div class="campaign-stat-card success">
-              <div class="stat-icon">✅</div>
+              <div class="stat-icon"><svg class="icon"><use href="#icon-check"/></svg></div>
               <div class="stat-value">${campaign.sentCount}</div>
               <div class="stat-label">Enviados</div>
             </div>
             <div class="campaign-stat-card error">
-              <div class="stat-icon">❌</div>
+              <div class="stat-icon"><svg class="icon"><use href="#icon-x"/></svg></div>
               <div class="stat-value">${campaign.failedCount}</div>
               <div class="stat-label">Fallidos</div>
             </div>
             <div class="campaign-stat-card">
-              <div class="stat-icon">📈</div>
+              <div class="stat-icon"><svg class="icon"><use href="#icon-trending-up"/></svg></div>
               <div class="stat-value">${successRate}%</div>
               <div class="stat-label">Tasa de Éxito</div>
             </div>
@@ -1650,28 +1650,28 @@ class DashboardApp {
 
           <!-- Mensaje -->
           <div class="campaign-message-box">
-            <h4>📝 Mensaje Enviado</h4>
+            <h4>Mensaje Enviado</h4>
             <pre>${campaign.message}</pre>
           </div>
 
           <!-- Filtros Aplicados -->
           ${campaign.filters ? `
             <div class="campaign-filters-box">
-              <h4>🎯 Filtros Aplicados</h4>
+              <h4>Filtros Aplicados</h4>
               <div class="filters-tags">
-                ${campaign.filters.hasShopify === 'true' ? '<span class="filter-tag">🛍️ Con Shopify</span>' : ''}
-                ${campaign.filters.hasShopify === 'false' ? '<span class="filter-tag">❌ Sin Shopify</span>' : ''}
-                ${campaign.filters.hasScheduled === 'true' ? '<span class="filter-tag">📅 Agendaron</span>' : ''}
-                ${campaign.filters.hasScheduled === 'false' ? '<span class="filter-tag">❌ No agendaron</span>' : ''}
+                ${campaign.filters.hasShopify === 'true' ? '<span class="filter-tag">Con Shopify</span>' : ''}
+                ${campaign.filters.hasShopify === 'false' ? '<span class="filter-tag">Sin Shopify</span>' : ''}
+                ${campaign.filters.hasScheduled === 'true' ? '<span class="filter-tag">Agendaron</span>' : ''}
+                ${campaign.filters.hasScheduled === 'false' ? '<span class="filter-tag">No agendaron</span>' : ''}
                 ${campaign.filters.conversionStatus !== 'all' ? `<span class="filter-tag">Estado: ${campaign.filters.conversionStatus}</span>` : ''}
-                ${campaign.filters.leadTemperature !== 'all' ? `<span class="filter-tag">🌡️ ${campaign.filters.leadTemperature}</span>` : ''}
+                ${campaign.filters.leadTemperature !== 'all' ? `<span class="filter-tag">${campaign.filters.leadTemperature}</span>` : ''}
               </div>
             </div>
           ` : ''}
 
           <!-- Lista de Destinatarios -->
           <div class="campaign-recipients-box">
-            <h4>📋 Destinatarios (${campaign.recipients.length})</h4>
+            <h4>Destinatarios (${campaign.recipients.length})</h4>
             <div class="recipients-table-wrapper">
               <table class="recipients-detail-table">
                 <thead>
@@ -1685,10 +1685,10 @@ class DashboardApp {
                 <tbody>
                   ${campaign.recipients.map(recipient => {
                     const statusBadge = recipient.status === 'sent'
-                      ? '<span class="status-badge success">✅ Enviado</span>'
+                      ? '<span class="status-badge success">Enviado</span>'
                       : recipient.status === 'failed'
-                      ? '<span class="status-badge error">❌ Fallido</span>'
-                      : '<span class="status-badge">⏳ Pendiente</span>';
+                      ? '<span class="status-badge error">Fallido</span>'
+                      : '<span class="status-badge">Pendiente</span>';
 
                     return `
                       <tr>
