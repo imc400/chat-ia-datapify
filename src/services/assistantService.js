@@ -190,7 +190,7 @@ class AssistantService {
     });
 
     while (Date.now() - startTime < maxWaitTime) {
-      const run = await this.openai.beta.threads.runs.retrieve(threadId, runId);
+      const run = await this.openai.beta.threads.runs.retrieve(runId, { thread_id: threadId });
 
       logger.debug('🔄 Run status:', run.status);
 
