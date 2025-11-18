@@ -56,7 +56,7 @@ class CalendarSyncJob {
     try {
       logger.info('🔄 Iniciando sincronización calendario...');
 
-      // 1. Obtener conversaciones en estado "pending" que NO están marcadas como scheduled
+      // 1. Obtener conversaciones en estado "pending" o "link_sent" que NO están marcadas como scheduled
       const pendingConversations = await prisma.conversation.findMany({
         where: {
           OR: [
@@ -66,6 +66,14 @@ class CalendarSyncJob {
             },
             {
               outcome: 'pending',
+              scheduledMeeting: null,
+            },
+            {
+              outcome: 'link_sent',
+              scheduledMeeting: false,
+            },
+            {
+              outcome: 'link_sent',
               scheduledMeeting: null,
             },
           ],
@@ -79,7 +87,7 @@ class CalendarSyncJob {
         },
       });
 
-      logger.info(`📋 Encontradas ${pendingConversations.length} conversaciones pending`);
+      logger.info(`📋 Encontradas ${pendingConversations.length} conversaciones pending/link_sent`);
 
       let syncedCount = 0;
       let errorCount = 0;

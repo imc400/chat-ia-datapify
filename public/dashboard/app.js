@@ -105,6 +105,7 @@ class DashboardApp {
       // Esto debe coincidir con el conteo de la pestaña Chat que agrupa por teléfono
       document.getElementById('stat-total').textContent = data.funnel.uniqueLeads;
       document.getElementById('stat-hot').textContent = data.leads.hot;
+      document.getElementById('stat-links-sent').textContent = data.linksSent || 0;
       document.getElementById('stat-scheduled').textContent = data.scheduled;
       document.getElementById('stat-conversion').textContent = `${data.last7Days.conversionRate}%`;
       document.getElementById('active-badge').textContent = data.active;

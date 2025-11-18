@@ -23,7 +23,7 @@ model Conversation {
   startedAt             DateTime @default(now())
   endedAt               DateTime?
   status                String   @default("active") // 'active', 'completed', 'abandoned'
-  outcome               String?  // 'scheduled', 'disqualified', 'abandoned', 'pending'
+  outcome               String?  // 'scheduled', 'link_sent', 'disqualified', 'abandoned', 'pending'
   leadTemperature       String   @default("cold") // 'hot', 'warm', 'cold'
   leadScore             Int      @default(0) // 0-10
   scheduledMeeting      Boolean  @default(false)

@@ -492,6 +492,7 @@ class DashboardController {
         totalConversations,
         activeConversations,
         scheduledMeetings,
+        linksSent,
         pendingMeetings,
         disqualified,
         abandoned,
@@ -502,6 +503,7 @@ class DashboardController {
         prisma.conversation.count(),
         prisma.conversation.count({ where: { status: 'active' } }),
         prisma.conversation.count({ where: { outcome: 'scheduled' } }),
+        prisma.conversation.count({ where: { outcome: 'link_sent' } }),
         prisma.conversation.count({ where: { outcome: 'pending' } }),
         prisma.conversation.count({ where: { outcome: 'disqualified' } }),
         prisma.conversation.count({ where: { outcome: 'abandoned' } }),
@@ -538,9 +540,9 @@ class DashboardController {
         : 0;
 
       // ⭐ NUEVO: Funnel de conversión completo
-      const linksSent = pendingMeetings + scheduledMeetings; // Links enviados = pending + scheduled
-      const funnelConversionRate = linksSent > 0
-        ? ((scheduledMeetings / linksSent) * 100).toFixed(1)
+      const totalLinksSent = linksSent + scheduledMeetings; // Links enviados = link_sent + scheduled
+      const funnelConversionRate = totalLinksSent > 0
+        ? ((scheduledMeetings / totalLinksSent) * 100).toFixed(1)
         : 0;
       const overallConversionRate = totalConversations > 0
         ? ((scheduledMeetings / totalConversations) * 100).toFixed(1)
@@ -553,6 +555,7 @@ class DashboardController {
           total: totalConversations,
           active: activeConversations,
           scheduled: scheduledMeetings,
+          linksSent: linksSent, // ⭐ NUEVO: Links enviados esperando confirmación
           leads: {
             hot: hotLeads,
             warm: warmLeads,
@@ -564,16 +567,18 @@ class DashboardController {
             uniqueLeads: uniqueLeads,
             // 2. Conversaciones totales iniciadas
             conversationsStarted: totalConversations,
-            // 3. Links de agendamiento enviados
-            linksSent: linksSent, // pending + scheduled
-            // 4. Agendamientos confirmados
+            // 3. Links de agendamiento enviados (link_sent + scheduled)
+            linksSent: totalLinksSent,
+            // 3a. Links enviados esperando confirmación (link_sent)
+            linksWaitingConfirmation: linksSent,
+            // 4. Agendamientos confirmados (scheduled)
             scheduled: scheduledMeetings,
             // 5. Descalificados y abandonados
             disqualified: disqualified,
             abandoned: abandoned,
-            pending: pendingMeetings, // Links enviados esperando confirmación
+            pending: pendingMeetings, // Aún calificando
             // Tasas de conversión en cada etapa
-            linkConversionRate: parseFloat(funnelConversionRate), // De links a agendados
+            linkConversionRate: parseFloat(funnelConversionRate), // De links enviados a agendados
             leadConversionRate: parseFloat(leadConversionRate), // De leads únicos a agendados
             overallConversionRate: parseFloat(overallConversionRate), // De conversaciones a agendados
           },

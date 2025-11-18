@@ -114,11 +114,21 @@
             </div>
           </div>
           <div class="stat-card">
+            <div class="stat-icon">🔗</div>
+            <div class="stat-details">
+              <div class="stat-label">
+                Links Enviados
+                <span class="info-icon" data-tooltip="Leads que aceptaron agendar y recibieron el link de Google Calendar (esperando confirmación).<br><br><strong>Fórmula:</strong> COUNT(conversations WHERE outcome = 'link_sent')<br><br><em>Estos leads aún no han completado el agendamiento.</em>">ⓘ</span>
+              </div>
+              <div class="stat-value" id="stat-links-sent">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
             <div class="stat-icon">📅</div>
             <div class="stat-details">
               <div class="stat-label">
-                Reuniones Agendadas
-                <span class="info-icon" data-tooltip="Total de leads que agendaron reunión verificada en Google Calendar.<br><br><strong>Fórmula:</strong> COUNT(leads WHERE scheduledMeeting = true)<br><br><em>Se sincroniza automáticamente con Google Calendar.</em>">ⓘ</span>
+                Agendados Confirmados
+                <span class="info-icon" data-tooltip="Leads que realmente agendaron en Google Calendar (verificado).<br><br><strong>Fórmula:</strong> COUNT(conversations WHERE outcome = 'scheduled')<br><br><em>Se sincroniza automáticamente con Google Calendar cada 10 minutos.</em>">ⓘ</span>
               </div>
               <div class="stat-value" id="stat-scheduled">0</div>
             </div>

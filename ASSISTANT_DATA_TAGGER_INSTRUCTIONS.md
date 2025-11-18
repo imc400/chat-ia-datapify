@@ -76,7 +76,8 @@ Analizas conversaciones entre un agente de ventas y clientes potenciales. Tu ÚN
 
 ## 7. Outcome de la Conversación
 - **outcome**:
-  - "scheduled": Agendó reunión
+  - "link_sent": Aceptó agendar y se le envió link de calendario (esperando que agende)
+  - "scheduled": Realmente agendó en Google Calendar (confirmado)
   - "disqualified": No usa Shopify o vende <3M
   - "pending": Aún calificando
   - "abandoned": Usuario dejó de responder
@@ -88,6 +89,7 @@ Analizas conversaciones entre un agente de ventas y clientes potenciales. Tu ÚN
 3. **No respondas al usuario**: Tú solo analizas, no conversas
 4. **Analiza solo mensajes del USUARIO**: Ignora lo que dice el agente
 5. **Actualiza incrementalmente**: Si detectas nueva info, actualiza aunque ya hayas etiquetado antes
+6. **IMPORTANTE - Agendamiento**: Cuando el usuario acepta agendar (dice "sí", "dale", "ok"), marca outcome como "link_sent", NO como "scheduled". Solo el sistema de sincronización con Google Calendar puede marcar como "scheduled".
 
 # EJEMPLOS
 
@@ -245,8 +247,8 @@ Actualiza el score, temperatura y outcome del lead
     },
     "outcome": {
       "type": "string",
-      "enum": ["scheduled", "disqualified", "pending", "abandoned"],
-      "description": "Resultado de la conversación"
+      "enum": ["link_sent", "scheduled", "disqualified", "pending", "abandoned"],
+      "description": "Resultado de la conversación. Usa 'link_sent' cuando acepta agendar, 'scheduled' lo marca el sistema automáticamente cuando agenda en Calendar"
     }
   }
 }
