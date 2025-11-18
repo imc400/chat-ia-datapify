@@ -430,6 +430,10 @@ class MessageController {
       const leadData = {};
       const allText = history.map(h => h.content.toLowerCase()).join(' ');
 
+      // CRÍTICO: Solo analizar mensajes del USUARIO (no del agente)
+      const userMessages = history.filter(h => h.role === 'user');
+      const userText = userMessages.map(h => h.content.toLowerCase()).join(' ');
+
       // Extraer nombre (buscar "me llamo", "soy", etc)
       const namePatterns = [
         /me llamo (\w+)/i,
@@ -438,14 +442,14 @@ class MessageController {
       ];
 
       for (const pattern of namePatterns) {
-        const match = allText.match(pattern);
+        const match = userText.match(pattern);
         if (match) {
           leadData.name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
           break;
         }
       }
 
-      // Detectar Shopify (solo si el usuario lo menciona positivamente)
+      // Detectar Shopify (solo si el USUARIO lo menciona explícitamente)
       // Primero verificar si menciona otras plataformas (debería ser false)
       const otherPlatforms = [
         'woocommerce',
@@ -458,24 +462,28 @@ class MessageController {
         'mercado shops',
       ];
 
-      if (otherPlatforms.some(platform => allText.includes(platform))) {
+      if (otherPlatforms.some(platform => userText.includes(platform))) {
         leadData.hasShopify = false;
       } else if (
-        allText.includes('tengo shopify') ||
-        allText.includes('uso shopify') ||
-        allText.includes('mi tienda es shopify') ||
-        allText.includes('con shopify') ||
-        (allText.includes('shopify') && (allText.includes('sí') || allText.includes('si')))
+        userText.includes('tengo shopify') ||
+        userText.includes('uso shopify') ||
+        userText.includes('mi tienda es shopify') ||
+        userText.includes('con shopify') ||
+        userText.includes('mi shopify') ||
+        userText.includes('en shopify') ||
+        // ELIMINADA la condición amplia: (allText.includes('shopify') && (allText.includes('sí') || allText.includes('si')))
+        // Era demasiado permisiva y generaba falsos positivos
+        (userText.includes('shopify') && userText.includes('tienda'))
       ) {
         leadData.hasShopify = true;
       }
 
-      // Detectar inversión en publicidad
-      if (allText.includes('publicidad') || allText.includes('ads') || allText.includes('anuncios')) {
+      // Detectar inversión en publicidad (solo si el USUARIO lo menciona)
+      if (userText.includes('publicidad') || userText.includes('ads') || userText.includes('anuncios')) {
         leadData.investsInAds = true;
       }
 
-      // Extraer tipo de negocio
+      // Extraer tipo de negocio (solo de mensajes del USUARIO)
       const businessPatterns = [
         /vendo (\w+)/i,
         /tienda de (\w+)/i,
@@ -483,14 +491,14 @@ class MessageController {
       ];
 
       for (const pattern of businessPatterns) {
-        const match = allText.match(pattern);
+        const match = userText.match(pattern);
         if (match) {
           leadData.businessType = match[1];
           break;
         }
       }
 
-      // Extraer ventas mensuales (millones, palos, clp)
+      // Extraer ventas mensuales (millones, palos, clp) - solo de mensajes del USUARIO
       const revenuePatterns = [
         /(\d+)\s*millones/i,
         /(\d+)\s*palos/i,
@@ -498,7 +506,7 @@ class MessageController {
       ];
 
       for (const pattern of revenuePatterns) {
-        const match = allText.match(pattern);
+        const match = userText.match(pattern);
         if (match) {
           const amount = parseInt(match[1]) * 1000000; // Convertir a CLP
           leadData.monthlyRevenueCLP = BigInt(amount);
