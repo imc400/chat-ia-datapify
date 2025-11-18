@@ -246,7 +246,28 @@ class DataTaggerService {
 
       // Run falló
       if (run.status === 'failed' || run.status === 'cancelled' || run.status === 'expired') {
-        throw new Error(`Tagger run ${run.status}: ${run.last_error?.message || 'Unknown error'}`);
+        const errorMessage = run.last_error?.message || 'Unknown error';
+
+        // Si es rate limit, extraer tiempo de espera y reintentar
+        if (errorMessage.includes('Rate limit reached')) {
+          const match = errorMessage.match(/try again in ([\d.]+)s/);
+          if (match) {
+            const waitSeconds = parseFloat(match[1]);
+            logger.warn(`⏳ Data Tagger rate limit. Esperando ${waitSeconds}s antes de reintentar...`);
+
+            await new Promise(resolve => setTimeout(resolve, (waitSeconds + 1) * 1000));
+
+            // Reintentar el run
+            logger.info('🔄 Reintentando Data Tagger después de rate limit...');
+            const newRun = await this.openai.beta.threads.runs.create(threadId, {
+              assistant_id: this.assistantId,
+              tools: this.getAvailableTools(),
+            });
+            return this.waitForRunWithToolCalls(threadId, newRun.id, conversationId, maxWaitTime);
+          }
+        }
+
+        throw new Error(`Tagger run ${run.status}: ${errorMessage}`);
       }
 
       // Esperar antes de siguiente check

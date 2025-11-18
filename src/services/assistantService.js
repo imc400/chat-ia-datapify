@@ -199,7 +199,27 @@ class AssistantService {
       }
 
       if (run.status === 'failed' || run.status === 'cancelled' || run.status === 'expired') {
-        throw new Error(`Run ${run.status}: ${run.last_error?.message || 'Unknown error'}`);
+        const errorMessage = run.last_error?.message || 'Unknown error';
+
+        // Si es rate limit, extraer tiempo de espera y reintentar
+        if (errorMessage.includes('Rate limit reached')) {
+          const match = errorMessage.match(/try again in ([\d.]+)s/);
+          if (match) {
+            const waitSeconds = parseFloat(match[1]);
+            logger.warn(`⏳ Rate limit alcanzado. Esperando ${waitSeconds}s antes de reintentar...`);
+
+            await new Promise(resolve => setTimeout(resolve, (waitSeconds + 1) * 1000));
+
+            // Reintentar el run
+            logger.info('🔄 Reintentando run después de rate limit...');
+            const newRun = await this.openai.beta.threads.runs.create(threadId, {
+              assistant_id: this.assistantId,
+            });
+            return this.waitForRunCompletion(threadId, newRun.id, maxWaitTime);
+          }
+        }
+
+        throw new Error(`Run ${run.status}: ${errorMessage}`);
       }
 
       // Esperar antes de la siguiente verificación
