@@ -125,8 +125,24 @@ class AssistantService {
       });
 
       if (conversation?.openaiThreadId) {
-        // Thread ya existe
-        return conversation.openaiThreadId;
+        // Thread ya existe, verificar que sea válido
+        try {
+          // Intentar recuperar el thread para verificar que existe
+          await this.openai.beta.threads.retrieve(conversation.openaiThreadId);
+          logger.debug('Thread existente válido', { threadId: conversation.openaiThreadId });
+          return conversation.openaiThreadId;
+        } catch (error) {
+          // Thread no existe o es inválido (404), crear uno nuevo
+          if (error.status === 404) {
+            logger.warn('⚠️ Thread inválido detectado, creando nuevo', {
+              oldThreadId: conversation.openaiThreadId,
+              error: error.message,
+            });
+            // El thread será creado abajo
+          } else {
+            throw error; // Otro tipo de error
+          }
+        }
       }
 
       // Crear nuevo thread en OpenAI
