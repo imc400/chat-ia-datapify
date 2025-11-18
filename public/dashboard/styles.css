@@ -3,27 +3,47 @@
    ======================================== */
 
 :root {
-  --primary-color: #6366f1;
-  --primary-dark: #4f46e5;
-  --secondary-color: #8b5cf6;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --danger-color: #ef4444;
-  --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb;
-  --bg-tertiary: #f3f4f6;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --border-color: #e5e7eb;
-  --sidebar-bg: #1f2937;
-  --sidebar-text: #d1d5db;
-  --sidebar-active: #3b82f6;
-  --message-user: #e0e7ff;
-  --message-assistant: #ffffff;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  /* Paleta de colores Datapify */
+  --primary-color: #17B8A3;
+  --primary-dark: #129688;
+  --primary-light: #1FD4BE;
+  --secondary-color: #666666;
+  --success-color: #17B8A3;
+  --warning-color: #FF6B9D;
+  --danger-color: #EF4444;
+
+  /* Fondos */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F5;
+  --bg-tertiary: #FAFAFA;
+
+  /* Textos */
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+
+  /* Bordes */
+  --border-color: #E0E0E0;
+  --border-focus: #17B8A3;
+
+  /* Sidebar */
+  --sidebar-bg: #2A2A2A;
+  --sidebar-text: #CCCCCC;
+  --sidebar-active: #17B8A3;
+
+  /* Mensajes */
+  --message-user: #F0F9F7;
+  --message-assistant: #FFFFFF;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  /* Border radius consistente */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 }
 
 * {
@@ -33,11 +53,29 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   font-size: 14px;
   color: var(--text-primary);
   background: var(--bg-secondary);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================================
+   ICONOS Y ELEMENTOS VISUALES
+   ======================================== */
+
+.icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.nav-icon .icon {
+  width: 20px;
+  height: 20px;
 }
 
 /* ========================================
