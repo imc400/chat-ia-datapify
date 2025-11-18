@@ -106,7 +106,7 @@ router.post('/', async (req, res) => {
               // Procesar el status update de forma asíncrona
               const processStatusUpdate = async () => {
                 try {
-                  const prisma = require('../../db/prisma');
+                  const prisma = require('../db/prisma');
 
                   // Buscar el recipient por messageId
                   const recipient = await prisma.campaignRecipient.findFirst({
