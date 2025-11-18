@@ -137,16 +137,19 @@ class ThinkingEngine {
       // Datos estructurados del lead
       leadInfo: this.extractLeadInfo(userMessage, conversationHistory, leadData),
 
-      // Recomendación estratégica
-      recommendation: null, // Se calcula después
+      // Contexto temporal (tiempo entre mensajes)
+      temporal: this.analyzeTemporalContext(conversationHistory),
+
+      // Observaciones contextuales (reemplaza "recomendaciones")
+      observations: null, // Se calcula después
 
       // Metadata
       timestamp: new Date().toISOString(),
       processingTime: 0,
     };
 
-    // Generar recomendación basada en el análisis
-    analysis.recommendation = this.generateRecommendation(analysis);
+    // Generar observaciones contextuales basadas en el análisis
+    analysis.observations = this.generateObservations(analysis, userMessage);
 
     analysis.processingTime = Date.now() - startTime;
 
@@ -155,7 +158,7 @@ class ThinkingEngine {
       confidence: analysis.shopify.confidence,
       painLevel: analysis.pain.level,
       intent: analysis.intent.primary,
-      recommendation: analysis.recommendation.action,
+      timeSinceLastMessage: analysis.temporal.timeSinceLastUserMessage,
       processingTime: `${analysis.processingTime}ms`,
     });
 
@@ -465,93 +468,198 @@ class ThinkingEngine {
   }
 
   /**
-   * GENERACIÓN DE RECOMENDACIÓN ESTRATÉGICA
-   * ¿Qué debe hacer el agente ahora?
+   * ANÁLISIS TEMPORAL
+   * Analiza el tiempo transcurrido entre mensajes para entender el contexto temporal
    */
-  generateRecommendation(analysis) {
-    const { shopify, pain, intent, context } = analysis;
-
-    // CASO 1: Usuario confirmó Shopify + tiene dolor → OFRECER REUNIÓN
-    if (shopify.detected && shopify.confidence > 0.8 && pain.level !== 'none') {
+  analyzeTemporalContext(conversationHistory) {
+    if (conversationHistory.length === 0) {
       return {
-        action: 'propose_meeting',
-        priority: 'high',
-        reasoning: 'Usuario confirmó Shopify y expresó dolor/problema. Es un hot lead.',
-        nextQuestion: '¿Te tinca una llamada de 30 min para ver cómo te podemos ayudar?',
-        shouldTag: true,
-        tags: ['shopify', 'pain_detected', 'qualified'],
+        timeSinceLastUserMessage: null,
+        timeSinceConversationStart: null,
+        isResumingAfterGap: false,
+        gapDuration: null,
+        conversationFreshness: 'new',
       };
     }
 
-    // CASO 2: Usuario confirmó Shopify pero NO expresó dolor → CALIFICAR
-    if (shopify.detected && shopify.confidence > 0.8 && pain.level === 'none' && !context.questionsAsked.pain) {
-      return {
-        action: 'qualify_pain',
-        priority: 'high',
-        reasoning: 'Usuario tiene Shopify pero no sabemos si tiene problemas. Necesitamos calificar.',
-        nextQuestion: '¿Cómo te va con las ventas? ¿Inviertes en publicidad?',
-        shouldTag: true,
-        tags: ['shopify', 'needs_qualification'],
-      };
+    const now = new Date();
+
+    // Encontrar último mensaje del usuario
+    const userMessages = conversationHistory
+      .filter(m => m.role === 'user' || m.role === 'usuario')
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const lastUserMessage = userMessages[0];
+    const timeSinceLastUserMessage = lastUserMessage
+      ? Math.floor((now - new Date(lastUserMessage.timestamp)) / 1000) // segundos
+      : null;
+
+    // Tiempo desde el primer mensaje
+    const firstMessage = conversationHistory[0];
+    const timeSinceStart = Math.floor((now - new Date(firstMessage.timestamp)) / 1000);
+
+    // Detectar si hay un gap significativo (>1 hora)
+    const oneHour = 3600;
+    const sixHours = 21600;
+    const twentyFourHours = 86400;
+
+    let gapDuration = null;
+    let isResumingAfterGap = false;
+    let conversationFreshness = 'active';
+
+    if (timeSinceLastUserMessage > twentyFourHours) {
+      gapDuration = 'day_or_more';
+      isResumingAfterGap = true;
+      conversationFreshness = 'resumed_after_long_gap';
+    } else if (timeSinceLastUserMessage > sixHours) {
+      gapDuration = 'several_hours';
+      isResumingAfterGap = true;
+      conversationFreshness = 'resumed_after_hours';
+    } else if (timeSinceLastUserMessage > oneHour) {
+      gapDuration = 'over_an_hour';
+      isResumingAfterGap = true;
+      conversationFreshness = 'resumed_recently';
+    } else if (timeSinceStart < 300) { // < 5 minutos
+      conversationFreshness = 'very_fresh';
     }
 
-    // CASO 3: Usuario NO usa Shopify → DESCALIFICAR
-    if (shopify.shouldDisqualify) {
-      return {
-        action: 'disqualify',
-        priority: 'high',
-        reasoning: shopify.reason,
-        nextQuestion: null,
-        shouldTag: true,
-        tags: ['not_shopify', 'disqualified'],
-      };
-    }
-
-    // CASO 4: Usuario expresó dolor pero NO confirmó plataforma → PREGUNTAR PLATAFORMA
-    if (pain.level !== 'none' && !shopify.detected && !context.questionsAsked.platform) {
-      return {
-        action: 'ask_platform',
-        priority: 'critical',
-        reasoning: 'Usuario expresó dolor pero no sabemos si usa Shopify. DEBE preguntar plataforma AHORA.',
-        nextQuestion: '¿En qué plataforma está tu tienda? ¿Shopify, WooCommerce...?',
-        shouldTag: false,
-        tags: ['pain_detected', 'platform_unknown'],
-      };
-    }
-
-    // CASO 5: Usuario acepta reunión → PASAR LINK
-    if (intent.primary === 'scheduling' && context.questionsAsked.meeting) {
-      return {
-        action: 'send_calendar_link',
-        priority: 'high',
-        reasoning: 'Usuario aceptó la reunión. Enviar link de calendario.',
-        nextQuestion: null,
-        shouldTag: false,
-        tags: ['scheduling_accepted'],
-      };
-    }
-
-    // CASO 6: Conversación recién empieza → DESCUBRIR
-    if (context.phase === 'opening' || context.phase === 'discovery') {
-      return {
-        action: 'discover',
-        priority: 'medium',
-        reasoning: 'Conversación en fase temprana. Descubrir información del lead.',
-        nextQuestion: null, // El agente decidirá
-        shouldTag: false,
-        tags: ['discovery_phase'],
-      };
-    }
-
-    // DEFAULT: Continuar conversación natural
     return {
-      action: 'continue_conversation',
-      priority: 'low',
-      reasoning: 'Continuar conversación natural.',
-      nextQuestion: null,
-      shouldTag: false,
-      tags: [],
+      timeSinceLastUserMessage, // en segundos
+      timeSinceConversationStart: timeSinceStart,
+      isResumingAfterGap,
+      gapDuration,
+      conversationFreshness,
+      humanReadableGap: this.formatTimeDuration(timeSinceLastUserMessage),
     };
+  }
+
+  /**
+   * GENERACIÓN DE OBSERVACIONES CONTEXTUALES
+   * Provee HECHOS y OBSERVACIONES, NO acciones prescriptivas
+   * Permite que GPT-4o razone naturalmente
+   */
+  generateObservations(analysis, userMessage) {
+    const { shopify, pain, intent, context, temporal } = analysis;
+    const observations = {
+      situacion: '',
+      hechos_clave: [],
+      observaciones: [],
+      contexto_temporal: '',
+      preguntas_reflexivas: [],
+    };
+
+    // SITUACIÓN ACTUAL
+    if (temporal.isResumingAfterGap) {
+      observations.situacion = `El usuario está retomando la conversación después de ${temporal.humanReadableGap}. Su último mensaje es: "${userMessage}"`;
+    } else if (context.phase === 'opening') {
+      observations.situacion = `Conversación recién iniciada. El usuario acaba de escribir: "${userMessage}"`;
+    } else {
+      observations.situacion = `Conversación activa en fase ${context.phase}. El usuario acaba de decir: "${userMessage}"`;
+    }
+
+    // HECHOS CLAVE
+    if (shopify.detected) {
+      observations.hechos_clave.push(`✅ Usuario confirmó que usa Shopify (confianza: ${(shopify.confidence * 100).toFixed(0)}%)`);
+    } else if (shopify.shouldDisqualify) {
+      observations.hechos_clave.push(`❌ Usuario NO usa Shopify: ${shopify.reason}`);
+    } else {
+      observations.hechos_clave.push(`⚠️ Plataforma aún desconocida`);
+    }
+
+    if (pain.level !== 'none') {
+      observations.hechos_clave.push(`🔥 Dolor detectado: nivel ${pain.level} (señales: ${pain.signals.join(', ')})`);
+    }
+
+    if (analysis.leadInfo.name) {
+      observations.hechos_clave.push(`👤 Nombre: ${analysis.leadInfo.name}`);
+    }
+
+    if (context.questionsAsked.meeting) {
+      observations.hechos_clave.push(`📅 Ya se propuso una reunión anteriormente`);
+    }
+
+    // OBSERVACIONES CONTEXTUALES
+    if (temporal.isResumingAfterGap && userMessage.toLowerCase().match(/^(hola|buenas|hey|holi|alo)\b/)) {
+      observations.observaciones.push(
+        `El usuario solo saludó después de ${temporal.humanReadableGap} de silencio. No expresó intención clara.`
+      );
+      observations.observaciones.push(
+        'Posibles interpretaciones: (1) Retoma la conversación anterior, (2) Olvidó de qué hablábamos, (3) Tiene nueva consulta'
+      );
+    }
+
+    if (shopify.detected && !pain.level) {
+      observations.observaciones.push(
+        'Usuario confirmó Shopify pero no ha expresado frustración o problemas todavía'
+      );
+    }
+
+    if (shopify.detected && pain.level !== 'none' && !context.questionsAsked.meeting) {
+      observations.observaciones.push(
+        'Usuario califica como lead potencial: tiene Shopify y expresó problemas. No se le ha ofrecido reunión aún.'
+      );
+    }
+
+    if (intent.primary === 'scheduling' && !context.questionsAsked.meeting) {
+      observations.observaciones.push(
+        'Usuario muestra señales de aceptación pero no se había propuesto reunión previamente. Posible falso positivo.'
+      );
+    }
+
+    if (context.messageCount <= 3) {
+      observations.observaciones.push(
+        'Conversación muy temprana. Priorizar construcción de rapport sobre venta directa.'
+      );
+    }
+
+    // CONTEXTO TEMPORAL
+    if (temporal.isResumingAfterGap) {
+      observations.contexto_temporal = `Pasaron ${temporal.humanReadableGap} desde el último mensaje. La conversación se había pausado.`;
+    } else if (temporal.conversationFreshness === 'very_fresh') {
+      observations.contexto_temporal = 'Conversación muy reciente, en tiempo real.';
+    } else {
+      observations.contexto_temporal = 'Conversación fluida sin pausas significativas.';
+    }
+
+    // PREGUNTAS REFLEXIVAS (para que GPT-4o piense)
+    if (temporal.isResumingAfterGap && userMessage.toLowerCase().match(/^(hola|buenas|hey|holi|alo)\b/)) {
+      observations.preguntas_reflexivas.push(
+        '¿Qué haría un vendedor profesional cuando un lead saluda después de 24 horas sin contexto?'
+      );
+      observations.preguntas_reflexivas.push(
+        '¿Es apropiado enviar un link de agenda inmediatamente, o primero debería re-establecer contexto?'
+      );
+    }
+
+    if (shopify.detected && pain.level !== 'none') {
+      observations.preguntas_reflexivas.push(
+        '¿El lead está listo para una propuesta de reunión, o necesita más información primero?'
+      );
+    }
+
+    if (!shopify.detected && context.messageCount >= 3) {
+      observations.preguntas_reflexivas.push(
+        '¿Por qué el usuario aún no mencionó su plataforma? ¿No le he preguntado claramente, o está evadiendo?'
+      );
+    }
+
+    return observations;
+  }
+
+  /**
+   * Formatea duración en formato humano
+   */
+  formatTimeDuration(seconds) {
+    if (!seconds) return 'tiempo desconocido';
+
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days} día${days > 1 ? 's' : ''}`;
+    if (hours > 0) return `${hours} hora${hours > 1 ? 's' : ''}`;
+    if (minutes > 0) return `${minutes} minuto${minutes > 1 ? 's' : ''}`;
+    return `${seconds} segundo${seconds > 1 ? 's' : ''}`;
   }
 
   /**

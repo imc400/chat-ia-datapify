@@ -353,7 +353,8 @@ Genera UNA NUEVA respuesta que cumpla las reglas:
       logger.info('🧠 Generando respuesta con Thinking Engine', {
         shopifyDetected: thinkingAnalysis.shopify.detected,
         painLevel: thinkingAnalysis.pain.level,
-        recommendation: thinkingAnalysis.recommendation.action,
+        isResumingAfterGap: thinkingAnalysis.temporal.isResumingAfterGap,
+        timeSinceLastMessage: thinkingAnalysis.temporal.humanReadableGap,
       });
 
       // Si debe descalificar, retornar mensaje directamente
@@ -371,27 +372,33 @@ Genera UNA NUEVA respuesta que cumpla las reglas:
       const thinkingContext = this.buildThinkingContext(thinkingAnalysis, conversationHistory);
 
       // ============================================
-      // CHAIN-OF-THOUGHT PROMPT
-      // El agente RAZONA antes de responder
+      // CHAIN-OF-THOUGHT PROMPT (OBSERVACIONAL)
+      // El agente RAZONA naturalmente con el contexto
+      // NO se le dan instrucciones prescriptivas
       // ============================================
       const chainOfThoughtPrompt = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧠 ANÁLISIS DEL MENSAJE (Piensa antes de responder)
+🧠 CONTEXTO DE LA CONVERSACIÓN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${thinkingContext}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💭 AHORA RESPONDE:
+💭 TU ROL: Eres un vendedor profesional de Datapify
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Basado en el análisis, responde de forma natural, estratégica y humana.
+Lee el contexto anterior con atención. Piensa como un vendedor profesional:
+- ¿Qué está pasando en esta conversación?
+- ¿Qué busca el usuario con su último mensaje?
+- ¿Qué sería lo más natural y apropiado responder?
+- ¿Cómo avanzarías la conversación sin ser agresivo?
 
 IMPORTANTE:
-- Máximo 2-3 líneas
-- 1 pregunta como máximo
+- Responde de forma natural y humana (máximo 2-3 líneas)
+- Máximo 1 pregunta
 - Tono chileno casual
-- Reconoce lo que el usuario acaba de decir
-- Avanza la conversación estratégicamente`;
+- Si hay un gap temporal largo, reconócelo naturalmente
+- NO envíes links de agenda a menos que el usuario lo pida explícitamente
+- Deja que el usuario guíe la conversación cuando retoma después de un tiempo`;
 
       // ============================================
       // CONSTRUIR MENSAJES PARA EL LLM
@@ -461,61 +468,77 @@ IMPORTANTE:
   /**
    * 🧠 CONSTRUYE CONTEXTO DE PENSAMIENTO
    * Genera el prompt interno para que el agente "piense"
+   * NUEVO: Provee OBSERVACIONES en vez de RECOMENDACIONES
    */
   buildThinkingContext(analysis, history) {
     let context = '';
 
-    // 1. ¿Qué detecté en el último mensaje?
-    context += '📝 LO QUE ACABO DE DETECTAR:\n';
+    // 1. SITUACIÓN ACTUAL
+    context += '📍 SITUACIÓN ACTUAL:\n';
+    context += `${analysis.observations.situacion}\n\n`;
 
-    if (analysis.shopify.detected) {
-      context += `✅ Usuario CONFIRMÓ SHOPIFY (confianza: ${(analysis.shopify.confidence * 100).toFixed(0)}%)\n`;
-      context += `   Método: ${analysis.shopify.method}\n`;
-      context += `   → IMPORTANTE: Reconoce esto en tu respuesta\n`;
-    } else if (analysis.shopify.shouldDisqualify) {
-      context += `❌ Usuario NO usa Shopify (${analysis.shopify.reason})\n`;
+    // 2. CONTEXTO TEMPORAL
+    if (analysis.temporal.isResumingAfterGap) {
+      context += '⏰ CONTEXTO TEMPORAL:\n';
+      context += `${analysis.observations.contexto_temporal}\n`;
+      context += `Tiempo transcurrido: ${analysis.temporal.humanReadableGap}\n`;
+      context += `Estado de la conversación: ${analysis.temporal.conversationFreshness}\n\n`;
+    }
+
+    // 3. HECHOS CLAVE
+    context += '📊 HECHOS CLAVE:\n';
+    if (analysis.observations.hechos_clave.length > 0) {
+      analysis.observations.hechos_clave.forEach(hecho => {
+        context += `${hecho}\n`;
+      });
     } else {
-      context += `⚠️ No confirmó Shopify todavía\n`;
+      context += '- Aún no hay información clave detectada\n';
     }
-
-    if (analysis.pain.level !== 'none') {
-      context += `🔥 DOLOR DETECTADO: Nivel ${analysis.pain.level}\n`;
-      context += `   Señales: ${analysis.pain.signals.join(', ')}\n`;
-      context += `   → Empatiza con su problema\n`;
-    }
-
-    context += `🎯 Intención: ${analysis.intent.primary}\n`;
     context += '\n';
 
-    // 2. ¿Qué sé del usuario?
-    context += '👤 LO QUE SÉ DEL USUARIO:\n';
+    // 4. OBSERVACIONES CONTEXTUALES
+    if (analysis.observations.observaciones.length > 0) {
+      context += '🔍 OBSERVACIONES:\n';
+      analysis.observations.observaciones.forEach(obs => {
+        context += `• ${obs}\n`;
+      });
+      context += '\n';
+    }
+
+    // 5. LO QUE SÉ DEL USUARIO
+    context += '👤 INFORMACIÓN DEL USUARIO:\n';
     if (analysis.leadInfo.name) context += `- Nombre: ${analysis.leadInfo.name}\n`;
     if (analysis.leadInfo.business) context += `- Negocio: ${analysis.leadInfo.business}\n`;
     if (analysis.leadInfo.investsInAds) context += `- Invierte en publicidad\n`;
-
-    context += `- Mensajes intercambiados: ${analysis.context.messageCount}\n`;
-    context += `- Engagement: ${analysis.context.engagementLevel}\n`;
-    context += `- Fase: ${analysis.context.phase}\n`;
+    context += `- Total de mensajes: ${analysis.context.messageCount}\n`;
+    context += `- Nivel de engagement: ${analysis.context.engagementLevel}\n`;
+    context += `- Fase de conversación: ${analysis.context.phase}\n`;
     context += '\n';
 
-    // 3. ¿Qué preguntas ya hice?
+    // 6. PREGUNTAS YA REALIZADAS
     const asked = analysis.context.questionsAsked;
-    context += '❓ PREGUNTAS YA HECHAS:\n';
-    if (asked.name) context += '- ✅ Nombre\n';
-    if (asked.platform) context += '- ✅ Plataforma\n';
-    if (asked.business) context += '- ✅ Tipo de negocio\n';
-    if (asked.pain) context += '- ✅ Dolor/problema\n';
-    if (asked.meeting) context += '- ✅ Reunión propuesta\n';
-    context += '\n';
+    const questionsAskedList = [];
+    if (asked.name) questionsAskedList.push('Nombre');
+    if (asked.platform) questionsAskedList.push('Plataforma');
+    if (asked.business) questionsAskedList.push('Tipo de negocio');
+    if (asked.pain) questionsAskedList.push('Problema/dolor');
+    if (asked.meeting) questionsAskedList.push('Propuesta de reunión');
 
-    // 4. ¿Qué debería hacer ahora?
-    context += '🎯 RECOMENDACIÓN ESTRATÉGICA:\n';
-    context += `Acción: ${analysis.recommendation.action}\n`;
-    context += `Prioridad: ${analysis.recommendation.priority}\n`;
-    context += `Razón: ${analysis.recommendation.reasoning}\n`;
+    if (questionsAskedList.length > 0) {
+      context += '✅ TEMAS YA EXPLORADOS:\n';
+      questionsAskedList.forEach(q => {
+        context += `- ${q}\n`;
+      });
+      context += '\n';
+    }
 
-    if (analysis.recommendation.nextQuestion) {
-      context += `Sugerencia: "${analysis.recommendation.nextQuestion}"\n`;
+    // 7. PREGUNTAS REFLEXIVAS (para que GPT-4o razone)
+    if (analysis.observations.preguntas_reflexivas.length > 0) {
+      context += '💭 REFLEXIONA ANTES DE RESPONDER:\n';
+      analysis.observations.preguntas_reflexivas.forEach(pregunta => {
+        context += `• ${pregunta}\n`;
+      });
+      context += '\n';
     }
 
     return context;
