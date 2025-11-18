@@ -50,11 +50,10 @@ class MessageController {
 
       // 🧠 NUEVO: 4. ANÁLISIS PRE-RESPUESTA CON THINKING ENGINE
       // El agente PIENSA antes de responder, detectando información clave
-      const leadData = await conversationService.getLeadData(conversation.id);
       const thinkingAnalysis = await thinkingEngine.analyzeBeforeResponse(
         userMessage,
         history,
-        leadData
+        conversation.leadData // leadData viene incluido en conversation
       );
 
       logger.info('🧠 Thinking Engine completado', {
@@ -67,12 +66,10 @@ class MessageController {
       });
 
       // 5. GUARDAR DATOS DETECTADOS EN TIEMPO REAL (ANTES de responder)
+      const leadDataUpdates = {};
+
       if (thinkingAnalysis.shopify.detected && thinkingAnalysis.shopify.confidence > 0.7) {
-        await conversationService.updateLeadData(conversation.id, {
-          hasShopify: true,
-          detectionMethod: thinkingAnalysis.shopify.method,
-          detectionConfidence: thinkingAnalysis.shopify.confidence,
-        });
+        leadDataUpdates.hasShopify = true;
         logger.info('✅ Shopify detectado y guardado ANTES de responder', {
           phone: from,
           method: thinkingAnalysis.shopify.method,
@@ -81,17 +78,18 @@ class MessageController {
       }
 
       // Guardar nombre si fue extraído
-      if (thinkingAnalysis.leadInfo.name && !leadData?.name) {
-        await conversationService.updateLeadData(conversation.id, {
-          name: thinkingAnalysis.leadInfo.name,
-        });
+      if (thinkingAnalysis.leadInfo.name && !conversation.leadData?.name) {
+        leadDataUpdates.name = thinkingAnalysis.leadInfo.name;
       }
 
       // Guardar tipo de negocio si fue extraído
-      if (thinkingAnalysis.leadInfo.business && !leadData?.businessType) {
-        await conversationService.updateLeadData(conversation.id, {
-          businessType: thinkingAnalysis.leadInfo.business,
-        });
+      if (thinkingAnalysis.leadInfo.business && !conversation.leadData?.businessType) {
+        leadDataUpdates.businessType = thinkingAnalysis.leadInfo.business;
+      }
+
+      // Guardar si hay actualizaciones
+      if (Object.keys(leadDataUpdates).length > 0) {
+        await conversationService.updateLeadData(conversation.id, leadDataUpdates);
       }
 
       // 6. CALIFICAR LEAD (usando el análisis del thinking engine)
