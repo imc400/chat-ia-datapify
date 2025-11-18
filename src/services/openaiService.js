@@ -340,6 +340,188 @@ Genera UNA NUEVA respuesta que cumpla las reglas:
   }
 
   /**
+   * 🧠 NUEVO: Genera respuesta CON THINKING ENGINE
+   * El agente PIENSA antes de responder usando Chain-of-Thought
+   *
+   * @param {string} userMessage - Último mensaje del usuario
+   * @param {Array} conversationHistory - Historial
+   * @param {Object} thinkingAnalysis - Análisis del Thinking Engine
+   * @param {Object} leadScore - Calificación del lead
+   */
+  async generateResponseWithThinking(userMessage, conversationHistory, thinkingAnalysis, leadScore) {
+    try {
+      logger.info('🧠 Generando respuesta con Thinking Engine', {
+        shopifyDetected: thinkingAnalysis.shopify.detected,
+        painLevel: thinkingAnalysis.pain.level,
+        recommendation: thinkingAnalysis.recommendation.action,
+      });
+
+      // Si debe descalificar, retornar mensaje directamente
+      if (thinkingAnalysis.shopify.shouldDisqualify) {
+        const platform = thinkingAnalysis.shopify.reason.includes('WooCommerce') ? 'WooCommerce' :
+                         thinkingAnalysis.shopify.reason.includes('Magento') ? 'Magento' :
+                         thinkingAnalysis.shopify.reason.includes('VTEX') ? 'VTEX' : 'otra plataforma';
+
+        return `Datapify funciona solo con Shopify. Si algún día migras a Shopify, conversamos :)`;
+      }
+
+      // ============================================
+      // CONSTRUIR CONTEXTO DE PENSAMIENTO
+      // ============================================
+      const thinkingContext = this.buildThinkingContext(thinkingAnalysis, conversationHistory);
+
+      // ============================================
+      // CHAIN-OF-THOUGHT PROMPT
+      // El agente RAZONA antes de responder
+      // ============================================
+      const chainOfThoughtPrompt = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠 ANÁLISIS DEL MENSAJE (Piensa antes de responder)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${thinkingContext}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💭 AHORA RESPONDE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Basado en el análisis, responde de forma natural, estratégica y humana.
+
+IMPORTANTE:
+- Máximo 2-3 líneas
+- 1 pregunta como máximo
+- Tono chileno casual
+- Reconoce lo que el usuario acaba de decir
+- Avanza la conversación estratégicamente`;
+
+      // ============================================
+      // CONSTRUIR MENSAJES PARA EL LLM
+      // ============================================
+      const messages = [
+        {
+          role: 'system',
+          content: this.systemPrompt,
+        },
+        {
+          role: 'system',
+          content: chainOfThoughtPrompt,
+        },
+      ];
+
+      // Agregar historial (últimos 6 mensajes)
+      const recentHistory = conversationHistory.slice(-6);
+      recentHistory.forEach(msg => {
+        messages.push({
+          role: msg.role === 'usuario' || msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+        });
+      });
+
+      // Agregar mensaje actual
+      messages.push({
+        role: 'user',
+        content: userMessage,
+      });
+
+      // ============================================
+      // LLAMAR AL LLM CON PARÁMETROS OPTIMIZADOS
+      // ============================================
+      const completion = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: messages,
+        temperature: 0.7,  // 🎯 AJUSTADO: Más consistente (antes: 0.9)
+        max_tokens: 350,   // 🎯 AJUSTADO: Más espacio para pensar (antes: 200)
+        top_p: 0.95,
+        frequency_penalty: 0.5,
+        presence_penalty: 0.6,
+      });
+
+      let responseText = completion.choices[0].message.content.trim();
+
+      // Formatear para WhatsApp
+      const orchestrationService = require('./orchestrationService');
+      responseText = orchestrationService.formatForWhatsApp(responseText);
+
+      logger.info('✅ Respuesta generada con Thinking Engine', {
+        length: responseText.length,
+        tokensUsed: completion.usage.total_tokens,
+        shopifyAcknowledged: thinkingAnalysis.shopify.detected ? responseText.toLowerCase().includes('shopify') : 'n/a',
+      });
+
+      return responseText;
+
+    } catch (error) {
+      logger.error('Error generando respuesta con Thinking Engine:', error);
+
+      // Fallback a método tradicional
+      logger.warn('⚠️ Fallback a generateResponse tradicional');
+      return this.generateResponse(userMessage, conversationHistory, leadScore);
+    }
+  }
+
+  /**
+   * 🧠 CONSTRUYE CONTEXTO DE PENSAMIENTO
+   * Genera el prompt interno para que el agente "piense"
+   */
+  buildThinkingContext(analysis, history) {
+    let context = '';
+
+    // 1. ¿Qué detecté en el último mensaje?
+    context += '📝 LO QUE ACABO DE DETECTAR:\n';
+
+    if (analysis.shopify.detected) {
+      context += `✅ Usuario CONFIRMÓ SHOPIFY (confianza: ${(analysis.shopify.confidence * 100).toFixed(0)}%)\n`;
+      context += `   Método: ${analysis.shopify.method}\n`;
+      context += `   → IMPORTANTE: Reconoce esto en tu respuesta\n`;
+    } else if (analysis.shopify.shouldDisqualify) {
+      context += `❌ Usuario NO usa Shopify (${analysis.shopify.reason})\n`;
+    } else {
+      context += `⚠️ No confirmó Shopify todavía\n`;
+    }
+
+    if (analysis.pain.level !== 'none') {
+      context += `🔥 DOLOR DETECTADO: Nivel ${analysis.pain.level}\n`;
+      context += `   Señales: ${analysis.pain.signals.join(', ')}\n`;
+      context += `   → Empatiza con su problema\n`;
+    }
+
+    context += `🎯 Intención: ${analysis.intent.primary}\n`;
+    context += '\n';
+
+    // 2. ¿Qué sé del usuario?
+    context += '👤 LO QUE SÉ DEL USUARIO:\n';
+    if (analysis.leadInfo.name) context += `- Nombre: ${analysis.leadInfo.name}\n`;
+    if (analysis.leadInfo.business) context += `- Negocio: ${analysis.leadInfo.business}\n`;
+    if (analysis.leadInfo.investsInAds) context += `- Invierte en publicidad\n`;
+
+    context += `- Mensajes intercambiados: ${analysis.context.messageCount}\n`;
+    context += `- Engagement: ${analysis.context.engagementLevel}\n`;
+    context += `- Fase: ${analysis.context.phase}\n`;
+    context += '\n';
+
+    // 3. ¿Qué preguntas ya hice?
+    const asked = analysis.context.questionsAsked;
+    context += '❓ PREGUNTAS YA HECHAS:\n';
+    if (asked.name) context += '- ✅ Nombre\n';
+    if (asked.platform) context += '- ✅ Plataforma\n';
+    if (asked.business) context += '- ✅ Tipo de negocio\n';
+    if (asked.pain) context += '- ✅ Dolor/problema\n';
+    if (asked.meeting) context += '- ✅ Reunión propuesta\n';
+    context += '\n';
+
+    // 4. ¿Qué debería hacer ahora?
+    context += '🎯 RECOMENDACIÓN ESTRATÉGICA:\n';
+    context += `Acción: ${analysis.recommendation.action}\n`;
+    context += `Prioridad: ${analysis.recommendation.priority}\n`;
+    context += `Razón: ${analysis.recommendation.reasoning}\n`;
+
+    if (analysis.recommendation.nextQuestion) {
+      context += `Sugerencia: "${analysis.recommendation.nextQuestion}"\n`;
+    }
+
+    return context;
+  }
+
+  /**
    * Califica un lead (igual que Gemini)
    */
   qualifyLead(conversationHistory) {

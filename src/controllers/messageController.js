@@ -3,6 +3,7 @@ const aiService = require('../services/openaiService');
 const conversationService = require('../services/conversationService');
 const calendarService = require('../services/calendarService');
 const memoryService = require('../services/memoryService');
+const thinkingEngine = require('../services/thinkingEngine'); // 🧠 NUEVO: Thinking Engine
 const config = require('../config');
 const logger = require('../utils/logger');
 
@@ -47,7 +48,53 @@ class MessageController {
       // 3. OBTENER HISTORIAL DESDE BD (últimos 10 mensajes - contexto más rico)
       const history = await conversationService.getConversationHistory(conversation.id, 10);
 
-      // 4. CALIFICAR LEAD
+      // 🧠 NUEVO: 4. ANÁLISIS PRE-RESPUESTA CON THINKING ENGINE
+      // El agente PIENSA antes de responder, detectando información clave
+      const leadData = await conversationService.getLeadData(conversation.id);
+      const thinkingAnalysis = await thinkingEngine.analyzeBeforeResponse(
+        userMessage,
+        history,
+        leadData
+      );
+
+      logger.info('🧠 Thinking Engine completado', {
+        from,
+        shopifyDetected: thinkingAnalysis.shopify.detected,
+        shopifyConfidence: thinkingAnalysis.shopify.confidence,
+        painLevel: thinkingAnalysis.pain.level,
+        intent: thinkingAnalysis.intent.primary,
+        recommendation: thinkingAnalysis.recommendation.action,
+      });
+
+      // 5. GUARDAR DATOS DETECTADOS EN TIEMPO REAL (ANTES de responder)
+      if (thinkingAnalysis.shopify.detected && thinkingAnalysis.shopify.confidence > 0.7) {
+        await conversationService.updateLeadData(conversation.id, {
+          hasShopify: true,
+          detectionMethod: thinkingAnalysis.shopify.method,
+          detectionConfidence: thinkingAnalysis.shopify.confidence,
+        });
+        logger.info('✅ Shopify detectado y guardado ANTES de responder', {
+          phone: from,
+          method: thinkingAnalysis.shopify.method,
+          confidence: thinkingAnalysis.shopify.confidence,
+        });
+      }
+
+      // Guardar nombre si fue extraído
+      if (thinkingAnalysis.leadInfo.name && !leadData?.name) {
+        await conversationService.updateLeadData(conversation.id, {
+          name: thinkingAnalysis.leadInfo.name,
+        });
+      }
+
+      // Guardar tipo de negocio si fue extraído
+      if (thinkingAnalysis.leadInfo.business && !leadData?.businessType) {
+        await conversationService.updateLeadData(conversation.id, {
+          businessType: thinkingAnalysis.leadInfo.business,
+        });
+      }
+
+      // 6. CALIFICAR LEAD (usando el análisis del thinking engine)
       const leadScore = aiService.qualifyLead(history);
       await conversationService.updateLeadScore(conversation.id, leadScore);
 
@@ -58,16 +105,17 @@ class MessageController {
         phase: leadScore.phase,
       });
 
-      // 5. GENERAR RESPUESTA CON IA
-      const aiResponse = await aiService.generateResponse(
+      // 7. GENERAR RESPUESTA CON IA (CON CONTEXTO DEL THINKING ENGINE)
+      const aiResponse = await aiService.generateResponseWithThinking(
         userMessage,
         history,
+        thinkingAnalysis, // 🧠 NUEVO: Incluye análisis profundo
         leadScore
       );
 
       const responseTime = Date.now() - startTime;
 
-      // 6. GUARDAR RESPUESTA DEL ASISTENTE EN BD
+      // 8. GUARDAR RESPUESTA DEL ASISTENTE EN BD
       await conversationService.saveMessage(
         conversation.id,
         'assistant',
@@ -76,10 +124,10 @@ class MessageController {
         responseTime
       );
 
-      // 7. ENVIAR RESPUESTA AL USUARIO
+      // 9. ENVIAR RESPUESTA AL USUARIO
       await whatsappService.sendTextMessage(from, aiResponse);
 
-      // 8. LÓGICA DE AGENDAMIENTO MEJORADA
+      // 10. LÓGICA DE AGENDAMIENTO MEJORADA
       const userConfirms = this.userConfirmsScheduling(userMessage);
 
       // Verificar si el agente mencionó agendar/reunión en mensajes recientes
@@ -153,8 +201,9 @@ class MessageController {
         });
       }
 
-      // 9. EXTRACCIÓN AUTOMÁTICA DE DATOS DEL LEAD
-      await this.extractAndSaveLeadData(conversation.id, history);
+      // 🧠 NOTA: La extracción de datos ahora ocurre ANTES de responder
+      // mediante el Thinking Engine (líneas 51-95)
+      // Ya no necesitamos extractAndSaveLeadData() después
 
     } catch (error) {
       logger.error('Error procesando mensaje:', {
